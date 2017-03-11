@@ -7,7 +7,9 @@ import (
 	"sync"
 	"time"
 
-	utils "github.com/1046102779/common"
+	pb "github.com/1046102779/igrpc"
+
+	"github.com/1046102779/common/consts"
 	"github.com/1046102779/official_account/conf"
 	. "github.com/1046102779/official_account/logger"
 	"github.com/1046102779/official_account/models"
@@ -69,7 +71,9 @@ func (t *MessageController) WechatCallback() {
 	timestamp := t.GetString("timestamp")
 	nonce := t.GetString("nonce")
 	msgSignature := t.GetString("msg_signature")
-	e, err := wxencrypter.NewEncrypter(conf.WechatParam.Token, conf.WechatParam.EncodingAesKey, conf.WechatParam.AppId)
+	in := &pb.OfficialAccountPlatform{}
+	conf.WxRelayServerClient.Call(fmt.Sprintf("%s.%s", "wx_relay_server", "GetOfficialAccountPlatformInfo"), in, in)
+	e, err := wxencrypter.NewEncrypter(in.Token, in.EncodingAesKey, in.Appid)
 	if err != nil {
 		Logger.Error("NewEncrypter failed. " + err.Error())
 	}
@@ -106,12 +110,12 @@ func (t *MessageController) WechatCallback() {
 		Appid:        appid,
 		ToUserName:   reqMap["ToUserName"],
 		FromUserName: reqMap["FromUserName"],
-		CreateTime:   time.Now(), // ::TODO
+		CreateTime:   now,
 		MsgType:      reqMap["MsgType"],
 		Event:        reqMap["Event"],
 		Content:      reqMap["Content"],
 		MsgId:        reqMap["MsgID"],
-		Status:       utils.STATUS_VALID,
+		Status:       consts.STATUS_VALID,
 		CreatedAt:    now,
 	}
 	if _, err := messageReceiptRecord.InsertWechatMessageReceiptRecordNoLock(&o); err != nil {

@@ -3,7 +3,7 @@ package controllers
 import (
 	"time"
 
-	utils "github.com/1046102779/common"
+	"github.com/1046102779/common/consts"
 	. "github.com/1046102779/official_account/logger"
 	"github.com/1046102779/official_account/models"
 	"github.com/astaxie/beego"
@@ -40,13 +40,13 @@ func (t *AccountMessageTemplatesController) LogicDeleteAccountMessageTemplate() 
 		err := errors.New("param `:id` hasn't include `:message_id`")
 		Logger.Error(err.Error())
 		t.Data["json"] = map[string]interface{}{
-			"err_code": utils.SOURCE_DATA_ILLEGAL,
+			"err_code": consts.ERROR_CODE__SOURCE_DATA__ILLEGAL,
 			"err_msg":  errors.Cause(err).Error(),
 		}
 		t.ServeJSON()
 		return
 	}
-	accountMessageTemplate.Status = utils.STATUS_DELETED
+	accountMessageTemplate.Status = consts.STATUS_DELETED
 	accountMessageTemplate.UpdatedAt = now
 	if retcode, err := accountMessageTemplate.LogicDeleteAccountMessageTemplateNoLock(&o); err != nil {
 		Logger.Error(err.Error())
@@ -78,7 +78,7 @@ func (t *AccountMessageTemplatesController) AddAccountMessageTemplate() {
 	if err := jsoniter.Unmarshal(t.Ctx.Input.RequestBody, messageTemplateInfo); err != nil {
 		Logger.Error(err.Error())
 		t.Data["json"] = map[string]interface{}{
-			"err_code": utils.JSON_PARSE_FAILED,
+			"err_code": consts.ERROR_CODE__JSON__PARSE_FAILED,
 			"err_msg":  errors.Cause(err).Error(),
 		}
 		t.ServeJSON()

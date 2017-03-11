@@ -3,7 +3,7 @@ package models
 import (
 	"fmt"
 
-	utils "github.com/1046102779/common"
+	"github.com/1046102779/common/consts"
 	. "github.com/1046102779/common/utils"
 	"github.com/1046102779/official_account/conf"
 	. "github.com/1046102779/official_account/logger"
@@ -42,7 +42,7 @@ func GetWechatPayParams(id int) (payParamInfo *WechatPayParamInfo, retcode int, 
 	if id <= 0 {
 		err = errors.New("pay param `:id` empty")
 		Logger.Error(err.Error())
-		retcode = utils.SOURCE_DATA_ILLEGAL
+		retcode = consts.ERROR_CODE__SOURCE_DATA__ILLEGAL
 		return
 	}
 	payParamInfo = new(WechatPayParamInfo)
@@ -57,20 +57,21 @@ func GetWechatPayParams(id int) (payParamInfo *WechatPayParamInfo, retcode int, 
 	}
 	payParamInfo.Appid = officialAccount.Appid
 	// 获取公众号支付参数
-	num, err = o.QueryTable((&OfficialAccountsPayParams{}).TableName()).Filter("official_account_id", id).Filter("status", utils.STATUS_VALID).All(&officialAccountsPayParams)
+	num, err = o.QueryTable((&OfficialAccountsPayParams{}).TableName()).Filter("official_account_id", id).Filter("status", consts.STATUS_VALID).All(&officialAccountsPayParams)
 	if err != nil {
 		err = errors.Wrap(err, "getWechatPayParams")
-		retcode = utils.DB_READ_ERROR
+		retcode = consts.ERROR_CODE__DB__READ
 		return
 	}
 	if num > 0 {
 		payParamInfo.Appkey = officialAccountsPayParams[0].Appkey
 		payParamInfo.MchId = officialAccountsPayParams[0].MchId
-		// 获取公众号支付证书
+		/*::TODO 建议用微信支付安全证书
 		payParamInfo.CertFile = fmt.Sprintf("%s/%s/%s", conf.CertificationDir, payParamInfo.Appid, "apiclient_cert.pem")
 		payParamInfo.KeyFile = fmt.Sprintf("%s/%s/%s", conf.CertificationDir, payParamInfo.Appid, "apiclient_key.pem")
+		*/
 	} else {
-		retcode = utils.SOURCE_DATA_ILLEGAL
+		retcode = consts.ERROR_CODE__SOURCE_DATA__ILLEGAL
 		err = errors.New("pay params `appkey | mch_id | appid | certification_files` not exist")
 		return
 	}
@@ -99,7 +100,7 @@ func UnifiedOrder(id int, bill *BillInfo, openId string, tradeType string, attac
 	unifiedOrderReqMap["device_info"] = ""
 	unifiedOrderReqMap["nonce_str"] = "nonce_str"
 	unifiedOrderReqMap["attach"] = attach // 附加数据，目前主要用于短信交易类型：短信充值、购买布匹交易
-	if tradeType == utils.TRADE_TYPE_JSAPI {
+	if tradeType == consts.TYPE_PAY__WECHAT__JSAPI {
 		unifiedOrderReqMap["out_trade_no"] = bill.TradeNoJsapi
 	} else {
 		unifiedOrderReqMap["out_trade_no"] = bill.TradeNoNative
@@ -116,6 +117,7 @@ func UnifiedOrder(id int, bill *BillInfo, openId string, tradeType string, attac
 	unifiedOrderReqMap["sign"] = mch.Sign(unifiedOrderReqMap, payParamInfo.Appkey, nil)
 
 	Logger.Debug("Get unified order:: request:: [%v]", unifiedOrderReqMap)
+	/* ::TODO 建议用微信支付安全证书
 	client, err := mch.NewTLSHttpClient(payParamInfo.CertFile, payParamInfo.KeyFile)
 	if err != nil {
 		err = errors.Wrap(err, "unifiedOrder")
@@ -123,6 +125,8 @@ func UnifiedOrder(id int, bill *BillInfo, openId string, tradeType string, attac
 		return
 	}
 	proxy := mch.NewProxy(payParamInfo.Appid, payParamInfo.MchId, payParamInfo.Appkey, client)
+	*/
+	proxy := mch.NewProxy(payParamInfo.Appid, payParamInfo.MchId, payParamInfo.Appkey, nil)
 	unifiedOrderRespMap = make(map[string]string)
 	unifiedOrderRespMap, err = pay.UnifiedOrder(proxy, unifiedOrderReqMap)
 	if err != nil {

@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/1046102779/official_account/conf"
-	"github.com/1046102779/official_account/models"
-	_ "github.com/1046102779/official_account/routers"
+	"git.kissdata.com/ycfm/official_account/conf"
+	"git.kissdata.com/ycfm/official_account/models"
+	_ "git.kissdata.com/ycfm/official_account/routers"
 
 	"github.com/astaxie/beego"
 	metrics "github.com/rcrowley/go-metrics"

@@ -1,15 +1,19 @@
+// 公众号用户组服务列表
+// 1. 通过OfficialAccountId和UserWxInfoId，获取openid
+// 2. 通过code换取access_token
+// 3. 获取可以得到请求CODE的url
+// 4. 通过open_id，获取user_wx_info的主键ID
 package models
 
 import (
 	"encoding/json"
 	"fmt"
 	"net/url"
-	"reflect"
-	"strings"
 	"time"
 
-	utils "github.com/1046102779/common"
+	"github.com/1046102779/common/consts"
 	"github.com/1046102779/common/httpRequest"
+	pb "github.com/1046102779/igrpc"
 	"github.com/1046102779/official_account/conf"
 	. "github.com/1046102779/official_account/logger"
 	"github.com/astaxie/beego/orm"
@@ -46,7 +50,7 @@ func (t *OfficialAccountUsers) InsertOfficialAccountNoLock(o *orm.Ormer) (retcod
 	defer Logger.Info("[%v] left InsertOfficialAccountNoLock.", t.OfficialAccountId)
 	if o == nil {
 		err = errors.New("param `orm.Ormer` ptr empty")
-		retcode = utils.DB_INSERT_ERROR
+		retcode = consts.ERROR_CODE__DB__INSERT
 		return
 	}
 	if _, err = (*o).Insert(t); err != nil {
@@ -61,7 +65,7 @@ func init() {
 }
 
 // 获取可以得到请求CODE的url
-func OfficialAccountAuthorizationUser(id int) (httpStr string, retcode int, err error) {
+func OfficialAccountAuthorizationUser(id int, callbackUrl string) (httpStr string, retcode int, err error) {
 	Logger.Info("[%v] enter OfficialAccountAuthorizationUser.", id)
 	defer Logger.Info("[%v] left OfficialAccountAuthorizationUser.", id)
 	o := orm.NewOrm()
@@ -73,22 +77,37 @@ func OfficialAccountAuthorizationUser(id int) (httpStr string, retcode int, err 
 		return
 	}
 	appid := officialAccount.Appid
-	httpStr = fmt.Sprintf("https://open.weixin.qq.com/connect/oauth2/authorize?appid=%s&redirect_uri=%s&response_type=code&scope=%s&component_appid=%s#wechat_redirect", appid, url.QueryEscape(fmt.Sprintf("%s%s", conf.HostName, "/v1/wechats/user/authorization/callback")), "snsapi_userinfo", conf.WechatParam.AppId)
+	in := &pb.OfficialAccountPlatform{}
+	conf.WxRelayServerClient.Call(fmt.Sprintf("%s.%s", "wx_relay_server", "GetOfficialAccountPlatformInfo"), in, in)
+	httpStr = fmt.Sprintf("https://open.weixin.qq.com/connect/oauth2/authorize?appid=%s&redirect_uri=%s&response_type=code&scope=%s&component_appid=%s#wechat_redirect", appid, url.QueryEscape(callbackUrl), "snsapi_userinfo", in.Appid)
 	return
 }
 
+// 绑定要返回的object对象信息{user，customer}
+type BindingSimpleInfo struct {
+	Id     int    `json:"id"`
+	Mobile string `json:"mobile"`
+}
+
+// param bindingStatus // 微信是否已经绑定过用户
+// param user, customer // 如果已绑定，则返回id等信息
 // 通过code换取access_token
-func GetUserAccessToken(appid string, code string) (retcode int, err error) {
+func GetUserAccessToken(appid string, code string) (bindingStatus int16, user *BindingSimpleInfo, customer *BindingSimpleInfo, openid string, retcode int, err error) {
 	Logger.Info("[%v] enter GetUserAccessToken.", appid)
 	defer Logger.Info("[%v] left GetUserAccessToken.", appid)
 	var (
-		retJson map[string]interface{} = map[string]interface{}{}
-		retBody []byte
+		retJson            map[string]interface{} = map[string]interface{}{}
+		retBody            []byte
+		userId, customerId int = 0, 0 // 如果微信已绑定用户，则返回userId或者customerID
 	)
-	httpStr := fmt.Sprintf("https://api.weixin.qq.com/sns/oauth2/component/access_token?appid=%s&code=%s&grant_type=authorization_code&component_appid=%s&component_access_token=%s", appid, code, conf.WechatParam.AppId, conf.WechatAuthTTL.ComponentAccessToken)
+	user = new(BindingSimpleInfo)
+	customer = new(BindingSimpleInfo)
+	in := &pb.OfficialAccountPlatform{}
+	conf.WxRelayServerClient.Call(fmt.Sprintf("%s.%s", "wx_relay_server", "GetOfficialAccountPlatformInfo"), in, in)
+	httpStr := fmt.Sprintf("https://api.weixin.qq.com/sns/oauth2/component/access_token?appid=%s&code=%s&grant_type=authorization_code&component_appid=%s&component_access_token=%s", appid, code, in.Appid, in.ComponentAccessToken)
 	if retJson, err = httpRequest.HttpGetJson(httpStr); err != nil {
 		err = errors.Wrap(err, "GetUserAccessToken")
-		retcode = utils.HTTP_CALL_FAILD_EXTERNAL
+		retcode = consts.ERROR_CODE__HTTP__CALL_FAILD_EXTERNAL
 		return
 	}
 	if _, ok := retJson["errcode"]; ok {
@@ -99,31 +118,53 @@ func GetUserAccessToken(appid string, code string) (retcode int, err error) {
 	}
 	// 获取用户授权信息, 包括token和refresh_token
 	accessToken := retJson["access_token"].(string)
-	openid := retJson["openid"].(string)
+	openid = retJson["openid"].(string)
 	httpStr = fmt.Sprintf("https://api.weixin.qq.com/sns/userinfo?access_token=%s&openid=%s&lang=zh_CN", accessToken, openid)
 	if retBody, err = httpRequest.HttpGetBody(httpStr); err != nil {
 		err = errors.Wrap(err, "GetUserAccessToken")
-		retcode = utils.HTTP_CALL_FAILD_EXTERNAL
+		retcode = consts.ERROR_CODE__HTTP__CALL_FAILD_EXTERNAL
 		return
 	}
 	wxBaseInfoResp := new(WxBaseInfoResp)
 	if err = json.Unmarshal(retBody, wxBaseInfoResp); err != nil {
 		err = errors.Wrap(err, "GetUserAccessToken")
-		retcode = utils.JSON_PARSE_FAILED
+		retcode = consts.ERROR_CODE__JSON__PARSE_FAILED
 		return
 	}
 	fmt.Println("wxBaseInfoResp: ", *wxBaseInfoResp)
 	// 1. 判断微信用户是否已经存在
 	// 2. 判断微信用户在该公众号appid下是否已存在
 	// 3. 否则，添加相关记录
-	if retcode, err = AddAuthorizationUserWxInfo(wxBaseInfoResp, appid); err != nil {
+	if bindingStatus, userId, customerId, retcode, err = AddAuthorizationUserWxInfo(wxBaseInfoResp, appid); err != nil {
 		err = errors.Wrap(err, "GetUserAccessToken")
 		return
+	}
+	// 填充绑定要返回的信息
+	if bindingStatus == consts.TYPE__WECHAT_USER_BINDING__USER {
+		// rpc 获取B端用户信息
+		userRpc := &pb.User{
+			UserId: int64(userId),
+			Type:   consts.TYPE__WECHAT_USER_BINDING__USER,
+		}
+		conf.AccountClient.Call(fmt.Sprintf("%s.%s", "accounts", "GetWechatBindingUserInfo"), userRpc, userRpc)
+		user.Id = int(userRpc.UserId)
+		user.Mobile = userRpc.Mobile
+	} else if bindingStatus == consts.TYPE__WECHAT_USER_BINDING__CUSTOMER {
+		//  rpc 获取客户信息
+		customerRpc := &pb.User{
+			UserId: int64(customerId),
+			Type:   consts.TYPE__WECHAT_USER_BINDING__CUSTOMER,
+		}
+		conf.AccountClient.Call(fmt.Sprintf("%s.%s", "accounts", "GetWechatBindingUserInfo"), customerRpc, customerRpc)
+		customer.Id = int(customerRpc.UserId)
+		customer.Mobile = customerRpc.Mobile
+	} else {
+		bindingStatus = consts.TYPE__WECHAT_USER_BINDING__NO
 	}
 	return
 }
 
-func AddAuthorizationUserWxInfo(base *WxBaseInfoResp, appid string) (retcode int, err error) {
+func AddAuthorizationUserWxInfo(base *WxBaseInfoResp, appid string) (bindingStatus int16, userId int, customerId int, retcode int, err error) {
 	Logger.Info("[%v] enter AddAuthorizationUserWxInfo.", appid)
 	defer Logger.Info("[%v] left AddAuthorizationUserWxInfo.", appid)
 	var (
@@ -138,12 +179,21 @@ func AddAuthorizationUserWxInfo(base *WxBaseInfoResp, appid string) (retcode int
 	num, err = o.QueryTable((&UserWxInfos{}).TableName()).Filter("nickname", base.Nickname).Filter("headimgurl", base.Headimgurl).All(&userWxInfos)
 	if err != nil {
 		err = errors.Wrap(err, "AddAuthorizationUserWxInfo")
-		retcode = utils.DB_READ_ERROR
+		retcode = consts.ERROR_CODE__DB__READ
 		return
 	}
 	if num > 0 {
 		// 微信用户已存在
 		userWxInfoId = userWxInfos[0].Id
+		userId = userWxInfos[0].UserId
+		customerId = userWxInfos[0].CustomerId
+		if userId <= 0 && customerId <= 0 {
+			bindingStatus = consts.TYPE__WECHAT_USER_BINDING__NO
+		} else if userId > 0 {
+			bindingStatus = consts.TYPE__WECHAT_USER_BINDING__USER
+		} else if customerId > 0 {
+			bindingStatus = consts.TYPE__WECHAT_USER_BINDING__CUSTOMER
+		}
 	} else {
 		// 新增微信用户
 		var privilege string
@@ -155,7 +205,6 @@ func AddAuthorizationUserWxInfo(base *WxBaseInfoResp, appid string) (retcode int
 			}
 		}
 		userWxInfo := &UserWxInfos{
-			UserId:     1, // ::TODO
 			Nickname:   base.Nickname,
 			Sex:        base.Sex,
 			Province:   base.Province,
@@ -175,16 +224,16 @@ func AddAuthorizationUserWxInfo(base *WxBaseInfoResp, appid string) (retcode int
 	num, err = o.QueryTable((&OfficialAccountUsers{}).TableName()).Filter("user_wx_info_id", userWxInfoId).Filter("openid", base.Openid).All(&officialAccountUsers)
 	if err != nil {
 		err = errors.Wrap(err, "AddAuthorizationUserWxInfo")
-		retcode = utils.DB_READ_ERROR
+		retcode = consts.ERROR_CODE__DB__READ
 		return
 	}
 	if num <= 0 {
 		// 新增公众账号的用户
 		officialAccounts := []OfficialAccounts{}
-		num, err = o.QueryTable((&OfficialAccounts{}).TableName()).Filter("appid", appid).Filter("status", utils.STATUS_VALID).All(&officialAccounts)
+		num, err = o.QueryTable((&OfficialAccounts{}).TableName()).Filter("appid", appid).Filter("status", consts.STATUS_VALID).All(&officialAccounts)
 		if err != nil {
 			err = errors.Wrap(err, "AddAuthorizationUserWxInfo")
-			retcode = utils.DB_READ_ERROR
+			retcode = consts.ERROR_CODE__DB__READ
 			return
 		}
 		if num > 0 {
@@ -192,7 +241,7 @@ func AddAuthorizationUserWxInfo(base *WxBaseInfoResp, appid string) (retcode int
 				OfficialAccountId: officialAccounts[0].Id,
 				UserWxInfoId:      userWxInfoId,
 				Openid:            base.Openid,
-				Status:            utils.STATUS_VALID,
+				Status:            consts.STATUS_VALID,
 				CreatedAt:         now,
 			}
 			if retcode, err = officialAccount.InsertOfficialAccountNoLock(&o); err != nil {
@@ -214,14 +263,14 @@ func GetopenidByCond(officialAccountId int, userWxInfoId int) (openid string, re
 	)
 	if officialAccountId <= 0 || userWxInfoId <= 0 {
 		err = errors.New("param `officialAccountId|| userWxInfoId` empty")
-		retcode = utils.SOURCE_DATA_ILLEGAL
+		retcode = consts.ERROR_CODE__SOURCE_DATA__ILLEGAL
 		return
 	}
 	o := orm.NewOrm()
-	num, err = o.QueryTable((&OfficialAccountUsers{}).TableName()).Filter("official_account_id", officialAccountId).Filter("user_wx_info_id", userWxInfoId).Filter("status", utils.STATUS_VALID).All(&officialAccountUsers)
+	num, err = o.QueryTable((&OfficialAccountUsers{}).TableName()).Filter("official_account_id", officialAccountId).Filter("user_wx_info_id", userWxInfoId).Filter("status", consts.STATUS_VALID).All(&officialAccountUsers)
 	if err != nil {
 		err = errors.Wrap(err, "GetopenidByCond")
-		retcode = utils.DB_READ_ERROR
+		retcode = consts.ERROR_CODE__DB__READ
 		return
 	}
 	if num > 0 {
@@ -230,76 +279,69 @@ func GetopenidByCond(officialAccountId int, userWxInfoId int) (openid string, re
 	return
 }
 
-// GetAllOfficialAccountUsers retrieves all OfficialAccountUsers matches certain condition. Returns empty list if
-// no records exist
-func GetAllOfficialAccountUsers(query map[string]string, fields []string, sortby []string, order []string,
-	offset int64, limit int64) (ml []interface{}, err error) {
+// 4. 通过open_id，获取user_wx_info的主键ID
+func GetUserWxInfoIdByOpenid(officialAccountId int, openid string) (id int, retcode int, err error) {
+	Logger.Info("[%v] enter GetUserWxInfoIdByOpenid.", openid)
+	defer Logger.Info("[%v] left GetUserWxInfoIdByOpenid.", openid)
+	var (
+		num                  int64
+		officialAccountUsers []*OfficialAccountUsers = []*OfficialAccountUsers{}
+	)
 	o := orm.NewOrm()
-	qs := o.QueryTable(new(OfficialAccountUsers))
-	// query k=v
-	for k, v := range query {
-		// rewrite dot-notation to Object__Attribute
-		k = strings.Replace(k, ".", "__", -1)
-		qs = qs.Filter(k, v)
+	num, err = o.QueryTable((&OfficialAccountUsers{}).TableName()).Filter("official_account_id", officialAccountId).Filter("openid", openid).All(&officialAccountUsers)
+	if err != nil {
+		err = errors.Wrap(err, "GetUserWxInfoIdByOpenid")
+		retcode = consts.ERROR_CODE__DB__READ
+		return
 	}
-	// order by:
-	var sortFields []string
-	if len(sortby) != 0 {
-		if len(sortby) == len(order) {
-			// 1) for each sort field, there is an associated order
-			for i, v := range sortby {
-				orderby := ""
-				if order[i] == "desc" {
-					orderby = "-" + v
-				} else if order[i] == "asc" {
-					orderby = v
-				} else {
-					return nil, errors.New("Error: Invalid order. Must be either [asc|desc]")
-				}
-				sortFields = append(sortFields, orderby)
-			}
-			qs = qs.OrderBy(sortFields...)
-		} else if len(sortby) != len(order) && len(order) == 1 {
-			// 2) there is exactly one order, all the sorted fields will be sorted by this order
-			for _, v := range sortby {
-				orderby := ""
-				if order[0] == "desc" {
-					orderby = "-" + v
-				} else if order[0] == "asc" {
-					orderby = v
-				} else {
-					return nil, errors.New("Error: Invalid order. Must be either [asc|desc]")
-				}
-				sortFields = append(sortFields, orderby)
-			}
-		} else if len(sortby) != len(order) && len(order) != 1 {
-			return nil, errors.New("Error: 'sortby', 'order' sizes mismatch or 'order' size is not 1")
-		}
-	} else {
-		if len(order) != 0 {
-			return nil, errors.New("Error: unused 'order' fields")
-		}
+	if num > 0 {
+		id = officialAccountUsers[0].UserWxInfoId
 	}
+	return
+}
 
-	var l []OfficialAccountUsers
-	qs = qs.OrderBy(sortFields...)
-	if _, err = qs.Limit(limit, offset).All(&l, fields...); err == nil {
-		if len(fields) == 0 {
-			for _, v := range l {
-				ml = append(ml, v)
-			}
-		} else {
-			// trim unused fields
-			for _, v := range l {
-				m := make(map[string]interface{})
-				val := reflect.ValueOf(v)
-				for _, fname := range fields {
-					m[fname] = val.FieldByName(fname).Interface()
-				}
-				ml = append(ml, m)
-			}
-		}
-		return ml, nil
+// 5. 通过公司ID和用户ID，获取公众号下的用户openid
+func getWxOpenIdByCompanyIdAndUserId(companyId int, userId int) (openid string, retcode int, err error) {
+	Logger.Info("[%v.%v] enter getWxOpenIdByCompanyIdAndUserId.", companyId, userId)
+	defer Logger.Info("[%v.%v] left getWxOpenIdByCompanyIdAndUserId.", companyId, userId)
+	var (
+		officialAccountId int = 0
+		userWxId          int
+	)
+	if officialAccountId, retcode, err = getOfficialAccountIdByCompanyId(companyId); err != nil {
+		err = errors.Wrap(err, "getWxOpenIdByCompanyIdAndUserId")
+		return
 	}
-	return nil, err
+	if userWxId, retcode, err = GetUserWxIdByUserId(userId); err != nil {
+		err = errors.Wrap(err, "getWxOpenIdByCompanyIdAndUserId")
+		return
+	}
+	if openid, retcode, err = GetopenidByCond(officialAccountId, userWxId); err != nil {
+		err = errors.Wrap(err, "getWxOpenIdByCompanyIdAndUserId")
+		return
+	}
+	return
+}
+
+// 5. 通过公司ID和客户ID，获取公众号下的用户openid
+func getWxOpenIdByCompanyIdAndCustomerId(companyId int, customerId int) (openid string, retcode int, err error) {
+	Logger.Info("[%v.%v] enter getWxOpenIdByCompanyIdAndCustomerId.", companyId, customerId)
+	defer Logger.Info("[%v.%v] left getWxOpenIdByCompanyIdAndCustomerId.", companyId, customerId)
+	var (
+		officialAccountId int = 0
+		userWxId          int
+	)
+	if officialAccountId, retcode, err = getOfficialAccountIdByCompanyId(companyId); err != nil {
+		err = errors.Wrap(err, "getWxOpenIdByCompanyIdAndUserId")
+		return
+	}
+	if userWxId, retcode, err = GetUserWxIdByCustomerId(customerId); err != nil {
+		err = errors.Wrap(err, "getWxOpenIdByCompanyIdAndUserId")
+		return
+	}
+	if openid, retcode, err = GetopenidByCond(officialAccountId, userWxId); err != nil {
+		err = errors.Wrap(err, "getWxOpenIdByCompanyIdAndUserId")
+		return
+	}
+	return
 }

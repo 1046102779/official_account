@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	utils "github.com/1046102779/common"
+	"github.com/1046102779/common/consts"
 	"github.com/1046102779/common/httpRequest"
 	. "github.com/1046102779/official_account/logger"
 	"github.com/pkg/errors"
@@ -34,7 +34,7 @@ func (t *WeMessageTemplate) SetOfficialAccountIndustry(firstIndustry int, secInd
 	)
 	if "" == strings.TrimSpace(accessToken) || firstIndustry <= 0 || secIndustry <= 0 {
 		err = errors.New("param `access_token | industry_id1 | industry_id2` empty")
-		retcode = utils.SOURCE_DATA_ILLEGAL
+		retcode = consts.ERROR_CODE__SOURCE_DATA__ILLEGAL
 		return
 	}
 	industryData.FirstIndustry = firstIndustry
@@ -44,7 +44,7 @@ func (t *WeMessageTemplate) SetOfficialAccountIndustry(firstIndustry int, secInd
 	retBody, err = httpRequest.HttpPostBody(httpStr, bodyData)
 	if err != nil {
 		err = errors.Wrap(err, "SetOfficialAccountIndustry")
-		retcode = utils.HTTP_CALL_FAILD_EXTERNAL
+		retcode = consts.ERROR_CODE__HTTP__CALL_FAILD_EXTERNAL
 		return
 	}
 	fmt.Println("Set Industry result: ", string(retBody))
@@ -71,19 +71,19 @@ func (t *WeMessageTemplate) GetOfficialAccountIndustry(accessToken string) (indu
 	industryInfo = new(IndustryInfo)
 	if "" == strings.TrimSpace(accessToken) {
 		err = errors.New("param `access_token` empty")
-		retcode = utils.SOURCE_DATA_ILLEGAL
+		retcode = consts.ERROR_CODE__SOURCE_DATA__ILLEGAL
 		return
 	}
 	httpStr := fmt.Sprintf("https://api.weixin.qq.com/cgi-bin/template/get_industry?access_token=%s", accessToken)
 	retBody, err = httpRequest.HttpGetBody(httpStr)
 	if err != nil {
 		err = errors.Wrap(err, "GetOfficialAccountIndustry")
-		retcode = utils.HTTP_CALL_FAILD_EXTERNAL
+		retcode = consts.ERROR_CODE__HTTP__CALL_FAILD_EXTERNAL
 		return
 	}
 	if err = json.Unmarshal(retBody, industryInfo); err != nil {
 		err = errors.Wrap(err, "GetOfficialAccountIndustry")
-		retcode = utils.JSON_PARSE_FAILED
+		retcode = consts.ERROR_CODE__JSON__PARSE_FAILED
 		return
 	}
 	return
@@ -103,7 +103,7 @@ func (t *WeMessageTemplate) GetTemplateId(accessToken string, templateCode strin
 	)
 	if "" == strings.TrimSpace(accessToken) || "" == strings.TrimSpace(templateCode) {
 		err = errors.New("param `access_token | message_template_code` empty")
-		retcode = utils.SOURCE_DATA_ILLEGAL
+		retcode = consts.ERROR_CODE__SOURCE_DATA__ILLEGAL
 		return
 	}
 	templateInfo.TemplateCode = templateCode
@@ -112,7 +112,7 @@ func (t *WeMessageTemplate) GetTemplateId(accessToken string, templateCode strin
 	retJson, err = httpRequest.HttpPostJson(httpStr, bodyData)
 	if err != nil {
 		err = errors.Wrap(err, "GetTemplateId")
-		retcode = utils.HTTP_CALL_FAILD_EXTERNAL
+		retcode = consts.ERROR_CODE__HTTP__CALL_FAILD_EXTERNAL
 		return
 	}
 	templateId = retJson["template_id"].(string)
@@ -141,19 +141,19 @@ func (t *WeMessageTemplate) GetTemplateList(accessToken string) (templateInfos *
 	templateInfos = new(TemplateInfos)
 	if "" == strings.TrimSpace(accessToken) {
 		err = errors.New("param `access_token` empty")
-		retcode = utils.SOURCE_DATA_ILLEGAL
+		retcode = consts.ERROR_CODE__SOURCE_DATA__ILLEGAL
 		return
 	}
 	httpStr := fmt.Sprintf("https://api.weixin.qq.com/cgi-bin/template/get_all_private_template?access_token=%s", accessToken)
 	retBody, err = httpRequest.HttpGetBody(httpStr)
 	if err != nil {
 		err = errors.Wrap(err, "GetTemplateList")
-		retcode = utils.HTTP_CALL_FAILD_EXTERNAL
+		retcode = consts.ERROR_CODE__HTTP__CALL_FAILD_EXTERNAL
 		return
 	}
 	if err = json.Unmarshal(retBody, templateInfos); err != nil {
 		err = errors.Wrap(err, "GetTemplateList")
-		retcode = utils.JSON_PARSE_FAILED
+		retcode = consts.ERROR_CODE__JSON__PARSE_FAILED
 		return
 	}
 	return
@@ -172,7 +172,7 @@ func (t *WeMessageTemplate) DeleteMessageTemplate(accessToken string, templateId
 	)
 	if "" == strings.TrimSpace(accessToken) || "" == strings.TrimSpace(templateId) {
 		err = errors.New("param `access_token | template_id`  empty")
-		retcode = utils.SOURCE_DATA_ILLEGAL
+		retcode = consts.ERROR_CODE__SOURCE_DATA__ILLEGAL
 		return
 	}
 	templateInfo.TemplateId = templateId
@@ -181,7 +181,7 @@ func (t *WeMessageTemplate) DeleteMessageTemplate(accessToken string, templateId
 	retJson, err = httpRequest.HttpPostJson(httpStr, bodyData)
 	if err != nil {
 		err = errors.Wrap(err, "DeleteMessageTemplate")
-		retcode = utils.HTTP_CALL_FAILD_EXTERNAL
+		retcode = consts.ERROR_CODE__HTTP__CALL_FAILD_EXTERNAL
 		return
 	}
 	retcode = int(retJson["errcode"].(float64))
@@ -207,7 +207,7 @@ func (t *WeMessageTemplate) SendMessage(accessToken string, templateId string, c
 	)
 	if "" == strings.TrimSpace(accessToken) || "" == strings.TrimSpace(templateId) || "" == strings.TrimSpace(string(content)) {
 		err = errors.New("param `access_token | template_id | message_content` empty")
-		retcode = utils.SOURCE_DATA_ILLEGAL
+		retcode = consts.ERROR_CODE__SOURCE_DATA__ILLEGAL
 		return
 	}
 	messageInfo := &MessageInfo{
@@ -218,14 +218,14 @@ func (t *WeMessageTemplate) SendMessage(accessToken string, templateId string, c
 	bodyData, err := json.Marshal(*messageInfo)
 	if err != nil {
 		Logger.Error(err.Error())
-		retcode = utils.JSON_PARSE_FAILED
+		retcode = consts.ERROR_CODE__JSON__PARSE_FAILED
 		return
 	}
 	httpStr := fmt.Sprintf("https://api.weixin.qq.com/cgi-bin/message/template/send?access_token=%s", accessToken)
 	retJson, err = httpRequest.HttpPostJson(httpStr, bodyData)
 	if err != nil {
 		err = errors.Wrap(err, "SendMessage")
-		retcode = utils.HTTP_CALL_FAILD_EXTERNAL
+		retcode = consts.ERROR_CODE__HTTP__CALL_FAILD_EXTERNAL
 		return
 	}
 	if retJson["errmsg"].(string) == "ok" {

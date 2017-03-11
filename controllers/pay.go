@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	utils "github.com/1046102779/common"
+	"github.com/1046102779/common/consts"
 	. "github.com/1046102779/common/utils"
 	pb "github.com/1046102779/igrpc"
 	"github.com/1046102779/official_account/conf"
@@ -52,7 +52,7 @@ func (w *WechatPayController) GetPayJsapiParams() {
 		Title:        "hello,world",
 		TradeNoJsapi: "YL-20170101122055",
 	}
-	payParamInfo, unifiedOrderRespMap, retcode, err := models.UnifiedOrder(id, bill, openId, utils.TRADE_TYPE_JSAPI, utils.WECHAT_PAY_BUSINESS_COMPANY_FABRIC_ORDER)
+	payParamInfo, unifiedOrderRespMap, retcode, err := models.UnifiedOrder(id, bill, openId, consts.TYPE_PAY__WECHAT__JSAPI, consts.TYPE_PAY_ENV__WECHAT__FABRIC_ORDER)
 	if err != nil {
 		Logger.Error("Get unified order for bill:[%v] error:%v", billId, err.Error())
 		w.Data["json"] = map[string]interface{}{
@@ -109,7 +109,7 @@ func (w *WechatPayController) GetPayNativeParams() {
 		TradeNoNative: fmt.Sprintf("YL-%s", time.Now().Format("20060102150405")),
 	}
 	//get unified order
-	_, unifiedOrderRespMap, retcode, err := models.UnifiedOrder(id, bill, "", utils.TRADE_TYPE_NATIVE, utils.WECHAT_PAY_BUSINESS_COMPANY_FABRIC_ORDER)
+	_, unifiedOrderRespMap, retcode, err := models.UnifiedOrder(id, bill, "", consts.TYPE_PAY__WECHAT__NATIVE, consts.TYPE_PAY_ENV__WECHAT__FABRIC_ORDER)
 	if err != nil {
 		Logger.Error("Get unified order for bill:[%v] error:%v", billId, err.Error())
 		w.Data["json"] = map[string]interface{}{
@@ -145,18 +145,24 @@ func (w *WechatPayController) NotifyUrl() {
 	} else {
 		if reqMap["return_code"] == "SUCCESS" && reqMap["result_code"] == "SUCCESS" {
 			fmt.Println("reqMap: ", reqMap)
+			money := ConvertStrToInt(reqMap["total_fee"])
 			switch reqMap["attach"] {
-			case utils.WECHAT_PAY_BUSINESS_PLATFORM_SMS_RECHARGE:
+			case consts.TYPE_PAY_ENV__WECHAT__SMS_RECHARGE:
 				// 平台短信充值业务
-				money := ConvertStrToInt(reqMap["total_fee"])
 				in := &pb.SmsRechargeOrderInfo{
 					OutTradeNo:    reqMap["out_trade_no"],
 					TransactionId: reqMap["transaction_id"],
 					Money:         int64(money),
 				}
 				conf.SmsClient.Call(fmt.Sprintf("%s.%s", "sms", "UpdateSmsRechargeInfo"), in, in)
-			case utils.WECHAT_PAY_BUSINESS_COMPANY_FABRIC_ORDER:
+			case consts.TYPE_PAY_ENV__WECHAT__FABRIC_ORDER:
 				// SaaS平台商家面料交易业务
+				in := &pb.FabricPatternPayInfo{
+					TradeNo:       reqMap["out_trade_no"],
+					TransactionId: reqMap["transaction_id"],
+					Money:         int64(money),
+				}
+				conf.SaleClient.Call(fmt.Sprintf("%s.%s", "sales", "UpdateSaleOrderPayInfo"), in, in)
 			}
 		}
 	}

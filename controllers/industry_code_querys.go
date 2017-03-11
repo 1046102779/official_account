@@ -1,7 +1,7 @@
 package controllers
 
 import (
-	utils "github.com/1046102779/common"
+	"github.com/1046102779/common/consts"
 	. "github.com/1046102779/official_account/logger"
 	"github.com/1046102779/official_account/models"
 	"github.com/astaxie/beego"
@@ -43,7 +43,7 @@ func (t *IndustryCodeQuerysController) GetSecIndutryListNoLocks() {
 		err := errors.New("param `:id` empty")
 		Logger.Error(err.Error())
 		t.Data["json"] = map[string]interface{}{
-			"err_code": utils.SOURCE_DATA_ILLEGAL,
+			"err_code": consts.ERROR_CODE__SOURCE_DATA__ILLEGAL,
 			"err_msg":  errors.Cause(err).Error(),
 		}
 		t.ServeJSON()

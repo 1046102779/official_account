@@ -6,7 +6,8 @@ import (
 	"strings"
 	"time"
 
-	utils "github.com/1046102779/common"
+	"github.com/1046102779/common/consts"
+	pb "github.com/1046102779/igrpc"
 	"github.com/1046102779/official_account/conf"
 	. "github.com/1046102779/official_account/logger"
 	"github.com/pkg/errors"
@@ -34,11 +35,11 @@ func (t *OfficialAccountIndustryCodes) InsertOfficialAccountIndustryCodesNoLock(
 	defer Logger.Info("[%v.%v] left InsertOfficialAccountIndustryCodesNoLock.", t.IndustryId1, t.IndustryId2)
 	if o == nil {
 		err = errors.New("param `orm.Ormer` ptr empty")
-		retcode = utils.SOURCE_DATA_ILLEGAL
+		retcode = consts.ERROR_CODE__SOURCE_DATA__ILLEGAL
 		return
 	}
 	if _, err = (*o).Insert(t); err != nil {
-		retcode = utils.DB_INSERT_ERROR
+		retcode = consts.ERROR_CODE__DB__INSERT
 		return
 	}
 	return
@@ -49,11 +50,11 @@ func (t *OfficialAccountIndustryCodes) ReadOfficialAccountIndustryNoLock(o *orm.
 	defer Logger.Info("[%v] left ReadOfficialAccountIndustryNoLock.", t.Id)
 	if o == nil {
 		err = errors.New("param `orm.Ormer` ptr empty")
-		retcode = utils.SOURCE_DATA_ILLEGAL
+		retcode = consts.ERROR_CODE__SOURCE_DATA__ILLEGAL
 		return
 	}
 	if err = (*o).Read(t); err != nil {
-		retcode = utils.DB_READ_ERROR
+		retcode = consts.ERROR_CODE__DB__READ
 		return
 	}
 	return
@@ -69,14 +70,14 @@ func (t *OfficialAccountIndustryCodes) GetOfficialAccountIndustryNoLock() (first
 	)
 	if t.OfficialAccountId <= 0 {
 		err = errors.New("param `official_account_id` empty")
-		retcode = utils.SOURCE_DATA_ILLEGAL
+		retcode = consts.ERROR_CODE__SOURCE_DATA__ILLEGAL
 		return
 	}
 	o := orm.NewOrm()
-	num, err = o.QueryTable(t.TableName()).Filter("official_account_id", t.OfficialAccountId).Filter("status", utils.STATUS_VALID).All(&officialAccountIndustryCodes)
+	num, err = o.QueryTable(t.TableName()).Filter("official_account_id", t.OfficialAccountId).Filter("status", consts.STATUS_VALID).All(&officialAccountIndustryCodes)
 	if err != nil {
 		err = errors.Wrap(err, "GetOfficialAccountIndustryNoLock")
-		retcode = utils.DB_READ_ERROR
+		retcode = consts.ERROR_CODE__DB__READ
 		return
 	}
 	if num > 0 {
@@ -118,12 +119,12 @@ func (t *OfficialAccountIndustryCodes) UpdateOfficialAccountIndustryCodeNoLock(o
 	now := time.Now()
 	if t.IndustryId1 <= 0 || t.IndustryId2 <= 0 {
 		err = errors.New("params `industry_id1 | industry_id2` empty")
-		retcode = utils.SOURCE_DATA_ILLEGAL
+		retcode = consts.ERROR_CODE__SOURCE_DATA__ILLEGAL
 		return
 	}
 	if o == nil {
 		err = errors.New("param `orm.Ormer` ptr  empty")
-		retcode = utils.DB_UPDATE_ERROR
+		retcode = consts.ERROR_CODE__DB__UPDATE
 		return
 	}
 
@@ -131,7 +132,7 @@ func (t *OfficialAccountIndustryCodes) UpdateOfficialAccountIndustryCodeNoLock(o
 	num, err = (*o).QueryTable(t.TableName()).Filter("official_account_id", t.OfficialAccountId).All(&original)
 	if err != nil {
 		err = errors.Wrap(err, "UpdateOfficialAccountIndustryCodeNoLock")
-		retcode = utils.DB_READ_ERROR
+		retcode = consts.ERROR_CODE__DB__READ
 		return
 	}
 	if num > 0 {
@@ -143,7 +144,7 @@ func (t *OfficialAccountIndustryCodes) UpdateOfficialAccountIndustryCodeNoLock(o
 			t.UpdatedAt = now
 			if _, err = (*o).Update(t); err != nil {
 				err = errors.Wrap(err, "UpdateOfficialAccountIndustryCodeNoLock")
-				retcode = utils.DB_UPDATE_ERROR
+				retcode = consts.ERROR_CODE__DB__UPDATE
 				return
 			}
 			// 设置公众号所属行业
@@ -153,10 +154,12 @@ func (t *OfficialAccountIndustryCodes) UpdateOfficialAccountIndustryCodeNoLock(o
 			}
 			if retcode, err = officialAccount.ReadOfficialAccountNoLock(o); err != nil {
 				err = errors.Wrap(err, "UpdateOfficialAccountIndustryCodeNoLock")
-				retcode = utils.DB_READ_ERROR
+				retcode = consts.ERROR_CODE__DB__READ
 				return
 			}
-			retcode, err = weMessageTemplate.SetOfficialAccountIndustry(t.IndustryId1, t.IndustryId2, conf.WechatAuthTTL.AuthorizerMap[officialAccount.Appid].AuthorizerAccessToken)
+			in := &pb.OfficialAccount{Appid: officialAccount.Appid}
+			conf.WxRelayServerClient.Call(fmt.Sprintf("%s.%s", "wx_relay_server", "GetOfficialAccountInfo"), in, in)
+			retcode, err = weMessageTemplate.SetOfficialAccountIndustry(t.IndustryId1, t.IndustryId2, in.AuthorizerAccessToken)
 			if err != nil {
 				err = errors.Wrap(err, "UpdateOfficialAccountIndustryCodeNoLock")
 				return

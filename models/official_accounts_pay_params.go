@@ -1,3 +1,7 @@
+// 微信公众号支付参数服务列表
+// 1. 支付证书上传
+// 2. 支付参数修改
+// 3. 通过公众号ID，获取公众号支付参数记录
 package models
 
 import (
@@ -5,11 +9,10 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"reflect"
 	"strings"
 	"time"
 
-	utils "github.com/1046102779/common"
+	"github.com/1046102779/common/consts"
 	"github.com/1046102779/official_account/conf"
 	. "github.com/1046102779/official_account/logger"
 	"github.com/pkg/errors"
@@ -37,12 +40,12 @@ func (t *OfficialAccountsPayParams) UpdateOfficialAccountsPayParamsNoLock(o *orm
 	defer Logger.Info("[%v] left UpdateOfficialAccountsPayParamsNoLock.", t.Id)
 	if o == nil {
 		err = errors.New("param `orm.Ormer` ptr empty")
-		retcode = utils.DB_UPDATE_ERROR
+		retcode = consts.ERROR_CODE__DB__UPDATE
 		return
 	}
 	if _, err = (*o).Update(t); err != nil {
 		err = errors.Wrap(err, "UpdateOfficialAccountsPayParamsNoLock")
-		retcode = utils.DB_UPDATE_ERROR
+		retcode = consts.ERROR_CODE__DB__UPDATE
 		return
 	}
 	return
@@ -53,11 +56,11 @@ func (t *OfficialAccountsPayParams) InsertOfficialAccountsPayParamsNoLock(o *orm
 	defer Logger.Info("left InsertOfficialAccountsPayParamsNoLock.")
 	if o == nil {
 		err = errors.New("param `orm.Ormer` ptr empty")
-		retcode = utils.DB_UPDATE_ERROR
+		retcode = consts.ERROR_CODE__DB__UPDATE
 		return
 	}
 	if _, err = (*o).Insert(t); err != nil {
-		retcode = utils.DB_INSERT_ERROR
+		retcode = consts.ERROR_CODE__DB__INSERT
 		err = errors.Wrap(err, "InsertOfficialAccountsPayParamsNoLock")
 		return
 	}
@@ -84,12 +87,12 @@ func UploadCertification(id int, req *http.Request) (retcode int, err error) {
 	file, header, newErr := req.FormFile("certification_file")
 	if header == nil {
 		err = errors.New("parse file empty")
-		retcode = utils.SOURCE_DATA_ILLEGAL
+		retcode = consts.ERROR_CODE__SOURCE_DATA__ILLEGAL
 		return
 	}
 	if header.Filename != "apiclient_key.pem" && header.Filename != "apiclient_cert.pem" {
 		err = errors.New("form param `filename` error")
-		retcode = utils.SOURCE_DATA_ILLEGAL
+		retcode = consts.ERROR_CODE__SOURCE_DATA__ILLEGAL
 		return
 	}
 	defer file.Close()
@@ -98,13 +101,13 @@ func UploadCertification(id int, req *http.Request) (retcode int, err error) {
 	defer newFile.Close()
 	if newErr != nil {
 		err = newErr
-		retcode = utils.SOURCE_DATA_ILLEGAL
+		retcode = consts.ERROR_CODE__SOURCE_DATA__ILLEGAL
 		return
 	}
 
 	_, err = io.Copy(newFile, file)
 	if err != nil {
-		retcode = utils.SOURCE_DATA_ILLEGAL
+		retcode = consts.ERROR_CODE__SOURCE_DATA__ILLEGAL
 		return
 	}
 	// end
@@ -127,10 +130,10 @@ func ModifyWechatParams(id int, appkey string, mchid string, name string) (retco
 		err = errors.Wrap(err, "ModifyWechatParams")
 		return
 	}
-	num, err = o.QueryTable((&OfficialAccountsPayParams{}).TableName()).Filter("official_account_id", id).Filter("status", utils.STATUS_VALID).All(&officialAccountsPayParams)
+	num, err = o.QueryTable((&OfficialAccountsPayParams{}).TableName()).Filter("official_account_id", id).Filter("status", consts.STATUS_VALID).All(&officialAccountsPayParams)
 	if err != nil {
 		err = errors.Wrap(err, "ModifyWechatParams")
-		retcode = utils.DB_READ_ERROR
+		retcode = consts.ERROR_CODE__DB__READ
 		return
 	}
 	if num > 0 {
@@ -156,7 +159,7 @@ func ModifyWechatParams(id int, appkey string, mchid string, name string) (retco
 			MchId:             mchid,
 			Name:              name,
 			Appkey:            appkey,
-			Status:            utils.STATUS_VALID,
+			Status:            consts.STATUS_VALID,
 			UpdatedAt:         now,
 			CreatedAt:         now,
 		}
@@ -168,76 +171,23 @@ func ModifyWechatParams(id int, appkey string, mchid string, name string) (retco
 	return
 }
 
-// GetAllOfficialAccountsPayParams retrieves all OfficialAccountsPayParams matches certain condition. Returns empty list if
-// no records exist
-func GetAllOfficialAccountsPayParams(query map[string]string, fields []string, sortby []string, order []string,
-	offset int64, limit int64) (ml []interface{}, err error) {
+// 3. 通过公众号ID，获取公众号支付参数记录
+func GetOfficialAccountPayParamByOfficialAccountId(id int) (officialAccountPayParam *OfficialAccountsPayParams, retcode int, err error) {
+	Logger.Info("[%v] enter GetOfficialAccountPayParamByOfficialAccountId.", id)
+	defer Logger.Info("[%v] left GetOfficialAccountPayParamByOfficialAccountId.", id)
+	var (
+		officialAccountsPayParams []*OfficialAccountsPayParams = []*OfficialAccountsPayParams{}
+		num                       int64
+	)
 	o := orm.NewOrm()
-	qs := o.QueryTable(new(OfficialAccountsPayParams))
-	// query k=v
-	for k, v := range query {
-		// rewrite dot-notation to Object__Attribute
-		k = strings.Replace(k, ".", "__", -1)
-		qs = qs.Filter(k, v)
+	num, err = o.QueryTable((&OfficialAccountsPayParams{}).TableName()).Filter("official_account_id", id).Filter("status", consts.STATUS_VALID).All(&officialAccountsPayParams)
+	if err != nil {
+		err = errors.Wrap(err, "GetOfficialAccountPayParamByOfficialAccountId")
+		retcode = consts.ERROR_CODE__DB__READ
+		return
 	}
-	// order by:
-	var sortFields []string
-	if len(sortby) != 0 {
-		if len(sortby) == len(order) {
-			// 1) for each sort field, there is an associated order
-			for i, v := range sortby {
-				orderby := ""
-				if order[i] == "desc" {
-					orderby = "-" + v
-				} else if order[i] == "asc" {
-					orderby = v
-				} else {
-					return nil, errors.New("Error: Invalid order. Must be either [asc|desc]")
-				}
-				sortFields = append(sortFields, orderby)
-			}
-			qs = qs.OrderBy(sortFields...)
-		} else if len(sortby) != len(order) && len(order) == 1 {
-			// 2) there is exactly one order, all the sorted fields will be sorted by this order
-			for _, v := range sortby {
-				orderby := ""
-				if order[0] == "desc" {
-					orderby = "-" + v
-				} else if order[0] == "asc" {
-					orderby = v
-				} else {
-					return nil, errors.New("Error: Invalid order. Must be either [asc|desc]")
-				}
-				sortFields = append(sortFields, orderby)
-			}
-		} else if len(sortby) != len(order) && len(order) != 1 {
-			return nil, errors.New("Error: 'sortby', 'order' sizes mismatch or 'order' size is not 1")
-		}
-	} else {
-		if len(order) != 0 {
-			return nil, errors.New("Error: unused 'order' fields")
-		}
+	if num > 0 {
+		officialAccountPayParam = officialAccountsPayParams[0]
 	}
-
-	var l []OfficialAccountsPayParams
-	qs = qs.OrderBy(sortFields...)
-	if _, err = qs.Limit(limit, offset).All(&l, fields...); err == nil {
-		if len(fields) == 0 {
-			for _, v := range l {
-				ml = append(ml, v)
-			}
-		} else {
-			// trim unused fields
-			for _, v := range l {
-				m := make(map[string]interface{})
-				val := reflect.ValueOf(v)
-				for _, fname := range fields {
-					m[fname] = val.FieldByName(fname).Interface()
-				}
-				ml = append(ml, m)
-			}
-		}
-		return ml, nil
-	}
-	return nil, err
+	return
 }

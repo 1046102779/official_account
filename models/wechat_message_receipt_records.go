@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	utils "github.com/1046102779/common"
+	"github.com/1046102779/common/consts"
 	. "github.com/1046102779/official_account/logger"
 	"github.com/pkg/errors"
 
@@ -35,12 +35,12 @@ func (t *WechatMessageReceiptRecords) InsertWechatMessageReceiptRecordNoLock(o *
 	defer Logger.Info("[%v] left WechatMessageReceiptRecordsNoLock", t.Appid)
 	if o == nil {
 		err = errors.New("param `orm.Ormer` ptr empty")
-		retcode = utils.SOURCE_DATA_ILLEGAL
+		retcode = consts.ERROR_CODE__SOURCE_DATA__ILLEGAL
 		return
 	}
 	if _, err = (*o).Insert(t); err != nil {
 		err = errors.Wrap(err, "InsertWechatMessageReceiptRecordNoLock")
-		retcode = utils.DB_INSERT_ERROR
+		retcode = consts.ERROR_CODE__DB__INSERT
 		return
 	}
 	return

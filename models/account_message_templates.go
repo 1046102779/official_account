@@ -1,11 +1,11 @@
 package models
 
 import (
-	"reflect"
-	"strings"
+	"fmt"
 	"time"
 
-	utils "github.com/1046102779/common"
+	"github.com/1046102779/common/consts"
+	pb "github.com/1046102779/igrpc"
 	"github.com/1046102779/official_account/conf"
 	. "github.com/1046102779/official_account/logger"
 	"github.com/pkg/errors"
@@ -36,7 +36,7 @@ func (t *AccountMessageTemplates) ReadAccountMessageTemplateNoLock(o *orm.Ormer)
 	}
 	if err = (*o).Read(t); err != nil {
 		err = errors.Wrap(err, "ReadAccountMessageTemplateNoLock")
-		retcode = utils.DB_READ_ERROR
+		retcode = consts.ERROR_CODE__DB__READ
 		return
 	}
 	return
@@ -51,7 +51,7 @@ func (t *AccountMessageTemplates) UpdateAccountMessageTemplateNoLock(o *orm.Orme
 	}
 	if _, err = (*o).Update(t); err != nil {
 		err = errors.Wrap(err, "UpdateAccountMessageTemplateNoLock")
-		retcode = utils.DB_UPDATE_ERROR
+		retcode = consts.ERROR_CODE__DB__UPDATE
 		return
 	}
 	return
@@ -96,7 +96,7 @@ func (t *AccountMessageTemplates) InsertAccountMessageTemplate(o *orm.Ormer) (re
 	}
 	if _, err = (*o).Insert(t); err != nil {
 		err = errors.Wrap(err, "InsertAccountMessageTemplate")
-		retcode = utils.DB_INSERT_ERROR
+		retcode = consts.ERROR_CODE__DB__INSERT
 		return
 	}
 	return
@@ -113,12 +113,12 @@ func GetAccountMessageTemplates(id int, pageIndex int, pageSize int, o *orm.Orme
 		err = errors.New("param `orm.Ormer` ptr empty")
 		return
 	}
-	qs := (*o).QueryTable((&AccountMessageTemplates{}).TableName()).Filter("status", utils.STATUS_VALID)
+	qs := (*o).QueryTable((&AccountMessageTemplates{}).TableName()).Filter("status", consts.STATUS_VALID)
 	count, _ = qs.Count()
 	realCount, err = qs.Limit(pageSize, pageSize*pageIndex).All(&accountMessageTemplates)
 	if err != nil {
 		err = errors.Wrap(err, "GetAccountMessageTemplates")
-		retcode = utils.DB_READ_ERROR
+		retcode = consts.ERROR_CODE__DB__READ
 		return
 	}
 	return
@@ -137,7 +137,7 @@ func AddAccountMessageTemplate(id int, messageTemplateId int) (accountMessageTem
 	now := time.Now()
 	if id <= 0 || messageTemplateId <= 0 {
 		err = errors.New("param `id || message_template_id` empty")
-		retcode = utils.SOURCE_DATA_ILLEGAL
+		retcode = consts.ERROR_CODE__SOURCE_DATA__ILLEGAL
 		return
 	}
 	// ::TODO  需要判断该公众号的消息模板数量是否达到25个，这个是微信的申请上限
@@ -145,11 +145,11 @@ func AddAccountMessageTemplate(id int, messageTemplateId int) (accountMessageTem
 	num, err = o.QueryTable(accountMessageTemplate.TableName()).Filter("official_account_id", id).Filter("system_message_template_id", messageTemplateId).All(&accountMessageTemplates)
 	if err != nil {
 		err = errors.Wrap(err, "AddAccountMessageTemplate")
-		retcode = utils.DB_READ_ERROR
+		retcode = consts.ERROR_CODE__DB__READ
 		return
 	}
 	if num > 0 {
-		if accountMessageTemplates[0].Status == utils.STATUS_VALID {
+		if accountMessageTemplates[0].Status == consts.STATUS_VALID {
 			// 有效
 			accountMessageTemplate = &accountMessageTemplates[0]
 			return
@@ -178,7 +178,7 @@ func AddAccountMessageTemplate(id int, messageTemplateId int) (accountMessageTem
 	}
 	if accountMessageTemplates != nil && len(accountMessageTemplates) > 0 {
 		// 无效
-		accountMessageTemplates[0].Status = utils.STATUS_VALID
+		accountMessageTemplates[0].Status = consts.STATUS_VALID
 		accountMessageTemplates[0].UpdatedAt = now
 		if retcode, err = accountMessageTemplates[0].UpdateAccountMessageTemplateNoLock(&o); err != nil {
 			err = errors.Wrap(err, "AddAccountMessageTemplate")
@@ -188,7 +188,7 @@ func AddAccountMessageTemplate(id int, messageTemplateId int) (accountMessageTem
 		// 添加到公众号消息模板中
 		accountMessageTemplate.OfficialAccountId = id
 		accountMessageTemplate.SystemMessageTemplateId = messageTemplateId
-		accountMessageTemplate.Status = utils.STATUS_VALID
+		accountMessageTemplate.Status = consts.STATUS_VALID
 		accountMessageTemplate.UpdatedAt = now
 		accountMessageTemplate.CreatedAt = now
 		if retcode, err = accountMessageTemplate.InsertAccountMessageTemplate(&o); err != nil {
@@ -219,14 +219,14 @@ func LogicDeleteAccountMessageTemplatesNoLocks(systemMessageTemplateId int, o *o
 		err = errors.New("param `id` illegal")
 		return
 	}
-	num, err = (*o).QueryTable((&AccountMessageTemplates{}).TableName()).Filter("system_message_template_id", systemMessageTemplateId).Filter("status", utils.STATUS_VALID).All(&accountMessageTemplates)
+	num, err = (*o).QueryTable((&AccountMessageTemplates{}).TableName()).Filter("system_message_template_id", systemMessageTemplateId).Filter("status", consts.STATUS_VALID).All(&accountMessageTemplates)
 	if err != nil {
-		retcode = utils.DB_READ_ERROR
+		retcode = consts.ERROR_CODE__DB__READ
 		err = errors.Wrap(err, "LogicDeleteAccountMessageTemplatesNoLocks")
 		return
 	}
 	for index := 0; index < int(num); index++ {
-		accountMessageTemplates[index].Status = utils.STATUS_DELETED
+		accountMessageTemplates[index].Status = consts.STATUS_DELETED
 		accountMessageTemplates[index].UpdatedAt = now
 		if retcode, err = (&accountMessageTemplates[index]).UpdateAccountMessageTemplateNoLock(o); err != nil {
 			err = errors.Wrap(err, "LogicDeleteAccountMessageTemplatesNoLocks")
@@ -243,11 +243,9 @@ func LogicDeleteAccountMessageTemplatesNoLocks(systemMessageTemplateId int, o *o
 			return
 		}
 		if offAcc.Appid != "" {
-			if _, ok := conf.WechatAuthTTL.AuthorizerMap[offAcc.Appid]; !ok {
-				Logger.Error("param `appid` not exists in maps")
-				continue
-			}
-			token = conf.WechatAuthTTL.AuthorizerMap[offAcc.Appid].AuthorizerAccessToken
+			in := &pb.OfficialAccount{Appid: offAcc.Appid}
+			conf.WxRelayServerClient.Call(fmt.Sprintf("%s.%s", "wx_relay_server", "GetOfficialAccountInfo"), in, in)
+			token = in.AuthorizerAccessToken
 			retcode, err = weMessageTemplate.DeleteMessageTemplate(token, accountMessageTemplates[index].TemplateId)
 			if err != nil {
 				err = errors.Wrap(err, "LogicDeleteAccountMessageTemplatesNoLocks")
@@ -258,76 +256,46 @@ func LogicDeleteAccountMessageTemplatesNoLocks(systemMessageTemplateId int, o *o
 	return
 }
 
-// GetAllAccountMessageTemplates retrieves all AccountMessageTemplates matches certain condition. Returns empty list if
-// no records exist
-func GetAllAccountMessageTemplates(query map[string]string, fields []string, sortby []string, order []string,
-	offset int64, limit int64) (ml []interface{}, err error) {
-	o := orm.NewOrm()
-	qs := o.QueryTable(new(AccountMessageTemplates))
-	// query k=v
-	for k, v := range query {
-		// rewrite dot-notation to Object__Attribute
-		k = strings.Replace(k, ".", "__", -1)
-		qs = qs.Filter(k, v)
+// @params: companyId: 公司ID
+// @params: name: 模板名称
+func getTemplateIdByCompanyIdAndName(companyId int, name string) (templateId string, retcode int, err error) {
+	// 获取系统模板的模板ID
+	var (
+		systemTemplateId  int // 平台系统消息模板ID
+		officialAccountId int // 公众号ID
+	)
+	if systemTemplateId, retcode, err = getTemplateIdByName(name); err != nil {
+		err = errors.Wrap(err, "getTemplateIdByCompanyIdAndName")
+		return
 	}
-	// order by:
-	var sortFields []string
-	if len(sortby) != 0 {
-		if len(sortby) == len(order) {
-			// 1) for each sort field, there is an associated order
-			for i, v := range sortby {
-				orderby := ""
-				if order[i] == "desc" {
-					orderby = "-" + v
-				} else if order[i] == "asc" {
-					orderby = v
-				} else {
-					return nil, errors.New("Error: Invalid order. Must be either [asc|desc]")
-				}
-				sortFields = append(sortFields, orderby)
-			}
-			qs = qs.OrderBy(sortFields...)
-		} else if len(sortby) != len(order) && len(order) == 1 {
-			// 2) there is exactly one order, all the sorted fields will be sorted by this order
-			for _, v := range sortby {
-				orderby := ""
-				if order[0] == "desc" {
-					orderby = "-" + v
-				} else if order[0] == "asc" {
-					orderby = v
-				} else {
-					return nil, errors.New("Error: Invalid order. Must be either [asc|desc]")
-				}
-				sortFields = append(sortFields, orderby)
-			}
-		} else if len(sortby) != len(order) && len(order) != 1 {
-			return nil, errors.New("Error: 'sortby', 'order' sizes mismatch or 'order' size is not 1")
-		}
-	} else {
-		if len(order) != 0 {
-			return nil, errors.New("Error: unused 'order' fields")
-		}
+	if officialAccountId, retcode, err = getOfficialAccountIdByCompanyId(companyId); err != nil {
+		err = errors.Wrap(err, "getTemplateIdByCompanyIdAndName")
+		return
 	}
+	templateId, retcode, err = getTemplateIdBySystemTemplateIdAndOfficialAccountId(systemTemplateId, officialAccountId)
+	if err != nil {
+		err = errors.Wrap(err, "getTemplateIdByCompanyIdAndName")
+		return
+	}
+	return
+}
 
-	var l []AccountMessageTemplates
-	qs = qs.OrderBy(sortFields...)
-	if _, err = qs.Limit(limit, offset).All(&l, fields...); err == nil {
-		if len(fields) == 0 {
-			for _, v := range l {
-				ml = append(ml, v)
-			}
-		} else {
-			// trim unused fields
-			for _, v := range l {
-				m := make(map[string]interface{})
-				val := reflect.ValueOf(v)
-				for _, fname := range fields {
-					m[fname] = val.FieldByName(fname).Interface()
-				}
-				ml = append(ml, m)
-			}
-		}
-		return ml, nil
+func getTemplateIdBySystemTemplateIdAndOfficialAccountId(systemTemplateId int, officialAccountId int) (templateId string, retcode int, err error) {
+	Logger.Info("[%v.%v] enter getTemplateIdBySystemTemplateIdAndOfficialAccountId.", systemTemplateId, officialAccountId)
+	defer Logger.Info("[%v.%v] left getTemplateIdBySystemTemplateIdAndOfficialAccountId.", systemTemplateId, officialAccountId)
+	var (
+		templates []*AccountMessageTemplates
+		num       int64 = 0
+	)
+	o := orm.NewOrm()
+	num, err = o.QueryTable((&AccountMessageTemplates{}).TableName()).Filter("official_account_id", officialAccountId).Filter("system_message_template_id", systemTemplateId).Filter("status", consts.STATUS_VALID).All(&templates)
+	if err != nil {
+		err = errors.Wrap(err, "getTemplateIdBySystemTemplateIdAndOfficialAccountId")
+		retcode = consts.ERROR_CODE__DB__READ
+		return
 	}
-	return nil, err
+	if num > 0 {
+		templateId = templates[0].TemplateId
+	}
+	return
 }

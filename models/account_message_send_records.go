@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	utils "github.com/1046102779/common"
+	"github.com/1046102779/common/consts"
 	. "github.com/1046102779/official_account/logger"
 	"github.com/pkg/errors"
 
@@ -33,11 +33,11 @@ func (t *AccountMessageSendRecords) InsertAccountMessageSendRecordNoLock(o *orm.
 	defer Logger.Info("[%v] left InsertAccountMessageSendRecordNoLock.", t.OfficialAccountId)
 	if o == nil {
 		err = errors.New("param `orm.Ormer` ptr empty")
-		retcode = utils.SOURCE_DATA_ILLEGAL
+		retcode = consts.ERROR_CODE__SOURCE_DATA__ILLEGAL
 		return
 	}
 	if _, err = (*o).Insert(t); err != nil {
-		retcode = utils.DB_INSERT_ERROR
+		retcode = consts.ERROR_CODE__DB__INSERT
 		return
 	}
 	return
@@ -58,12 +58,12 @@ func SendAccountMessage(id int, toUser string, templateId string, content json.R
 	o := orm.NewOrm()
 	num, err = o.QueryTable((&AccountMessageTemplates{}).TableName()).Filter("official_account_id", id).Filter("template_id", templateId).All(&accountMessageTemplates)
 	if err != nil {
-		retcode = utils.DB_READ_ERROR
+		retcode = consts.ERROR_CODE__DB__READ
 		return
 	}
 	if num <= 0 {
 		err = errors.New("the official account hasn't this message_template , please firstly apply template")
-		retcode = utils.WECHAT_MESSAGE_NOT_EXIST
+		retcode = consts.WECHAT_MESSAGE_NOT_EXIST
 		return
 	}
 	// 获取access_token
@@ -83,7 +83,7 @@ func SendAccountMessage(id int, toUser string, templateId string, content json.R
 		TemplateId:        templateId,
 		Content:           string(content),
 		ReceiverUser:      toUser,
-		Status:            utils.STATUS_VALID,
+		Status:            consts.STATUS_VALID,
 		UpdatedAt:         now,
 		CreatedAt:         now,
 	}

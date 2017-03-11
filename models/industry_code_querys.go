@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	utils "github.com/1046102779/common"
+	"github.com/1046102779/common/consts"
 	. "github.com/1046102779/official_account/logger"
 	"github.com/pkg/errors"
 
@@ -32,12 +32,12 @@ func (t *IndustryCodeQuerys) GetIndustryCodeQueryNoLock(o *orm.Ormer) (retcode i
 	defer Logger.Info("[%v] left GetIndustryCodeQueryNoLock.", t.Id)
 	if o == nil {
 		err = errors.New("param `orm.Ormer` ptr empty")
-		retcode = utils.SOURCE_DATA_ILLEGAL
+		retcode = consts.ERROR_CODE__SOURCE_DATA__ILLEGAL
 		return
 	}
 	if err = (*o).Read(t); err != nil {
 		err = errors.Wrap(err, "GetIndustryCodeQueryNoLock")
-		retcode = utils.DB_READ_ERROR
+		retcode = consts.ERROR_CODE__DB__READ
 		return
 	}
 	return
@@ -54,13 +54,13 @@ func (t *IndustryCodeQuerys) GetSecIndutryListNoLocks() (secIndustrys []Industry
 	secIndustrys = []IndustryInfoResp{}
 	if t.MainType <= 0 {
 		err = errors.New("param `main_type` empty")
-		retcode = utils.SOURCE_DATA_ILLEGAL
+		retcode = consts.ERROR_CODE__SOURCE_DATA__ILLEGAL
 		return
 	}
 	o := orm.NewOrm()
 	num, err = o.QueryTable(t.TableName()).Filter("main_type", t.MainType).All(&industryCodeQuerys)
 	if err != nil {
-		retcode = utils.DB_READ_ERROR
+		retcode = consts.ERROR_CODE__DB__READ
 		err = errors.Wrap(err, "GetSecIndutryListNoLocks")
 		return
 	}
@@ -90,9 +90,9 @@ func GetIndustryIdByName(mainIndustry string, secIndustry string) (id int, retco
 		industryCodes []IndustryCodeQuerys = []IndustryCodeQuerys{}
 	)
 	o := orm.NewOrm()
-	num, err = o.QueryTable((&IndustryCodeQuerys{}).TableName()).Filter("main_industry_code", mainIndustry).Filter("sec_industry_code", secIndustry).Filter("status", utils.STATUS_VALID).All(&industryCodes)
+	num, err = o.QueryTable((&IndustryCodeQuerys{}).TableName()).Filter("main_industry_code", mainIndustry).Filter("sec_industry_code", secIndustry).Filter("status", consts.STATUS_VALID).All(&industryCodes)
 	if err != nil {
-		retcode = utils.DB_READ_ERROR
+		retcode = consts.ERROR_CODE__DB__READ
 		return
 	}
 	if num > 0 {
@@ -111,10 +111,10 @@ func GetAllMainIndutryNoLocks() (mainIndustrys []IndustryInfoResp, retcode int, 
 	)
 	mainIndustrys = []IndustryInfoResp{}
 	o := orm.NewOrm()
-	num, err = o.QueryTable((&IndustryCodeQuerys{}).TableName()).Filter("status", utils.STATUS_VALID).GroupBy("main_type").All(&industryCodeQuerys)
+	num, err = o.QueryTable((&IndustryCodeQuerys{}).TableName()).Filter("status", consts.STATUS_VALID).GroupBy("main_type").All(&industryCodeQuerys)
 	if err != nil {
 		err = errors.Wrap(err, "GetAllMainIndutryNoLocks")
-		retcode = utils.DB_READ_ERROR
+		retcode = consts.ERROR_CODE__DB__READ
 		return
 	}
 	for index := 0; index < int(num); index++ {

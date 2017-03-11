@@ -1,3 +1,8 @@
+// 公众号服务列表
+// 1. 公众号与公司ID的绑定
+// 2. 获取公众号基本信息
+// 3. 获取公众号列表
+// 4. 通过公司ID，获取公众号信息
 package models
 
 import (
@@ -6,7 +11,8 @@ import (
 	"strings"
 	"time"
 
-	utils "github.com/1046102779/common"
+	"github.com/1046102779/common/consts"
+	pb "github.com/1046102779/igrpc"
 	"github.com/1046102779/official_account/conf"
 	. "github.com/1046102779/official_account/logger"
 	"github.com/pkg/errors"
@@ -14,8 +20,11 @@ import (
 	"github.com/astaxie/beego/orm"
 )
 
+const ()
+
 type OfficialAccounts struct {
 	Id                    int       `orm:"column(official_account_id);auto" json:"id"`
+	CompanyId             int       `orm:"column(company_id);null" json:"company_id"`
 	Nickname              string    `orm:"column(nickname);size(50);null" json:"nickname"`
 	AvartarUrl            string    `orm:"column(avartar_url);size(300);null" json:"avatar_url"`
 	ServiceTypeId         int16     `orm:"column(service_type_id);null" json:"service_type_id"`
@@ -40,17 +49,33 @@ func (t *OfficialAccounts) TableName() string {
 	return "official_accounts"
 }
 
+func (t *OfficialAccounts) UpdatedOfficialAccountNoLock(o *orm.Ormer) (retcode int, err error) {
+	Logger.Info("[%v] enter UpdatedOfficialAccountNoLock.", t.Id)
+	defer Logger.Info("[%v] left UpdatedOfficialAccountNoLock.", t.Id)
+	if o == nil {
+		err = errors.New("param `orm.Ormer` ptr empty")
+		retcode = consts.ERROR_CODE__SOURCE_DATA__ILLEGAL
+		return
+	}
+	if _, err = (*o).Update(t); err != nil {
+		err = errors.Wrap(err, "UpdatedOfficialAccountNoLock")
+		retcode = consts.ERROR_CODE__DB__UPDATE
+		return
+	}
+	return
+}
+
 func (t *OfficialAccounts) ReadOfficialAccountNoLock(o *orm.Ormer) (retcode int, err error) {
 	Logger.Info("[%v] enter ReadOfficialAccount.")
 	defer Logger.Info("[%v] enter ReadOfficialAccount.")
 	if o == nil {
 		err = errors.New("param `orm.Ormer` ptr empty")
-		retcode = utils.SOURCE_DATA_ILLEGAL
+		retcode = consts.ERROR_CODE__SOURCE_DATA__ILLEGAL
 		return
 	}
 	if err = (*o).Read(t); err != nil {
 		err = errors.Wrap(err, "ReadOfficialAccountNoLock")
-		retcode = utils.DB_READ_ERROR
+		retcode = consts.ERROR_CODE__DB__READ
 		return
 	}
 	return
@@ -61,17 +86,17 @@ func (t *OfficialAccounts) InsertOfficialAccountNoLock(o *orm.Ormer) (retcode in
 	defer Logger.Info("[%v] left InsertOfficialAccountNoLock.", t.Appid)
 	if o == nil {
 		err = errors.New("param `orm.Ormer` ptr empty")
-		retcode = utils.SOURCE_DATA_ILLEGAL
+		retcode = consts.ERROR_CODE__SOURCE_DATA__ILLEGAL
 		return
 	}
 	if "" == strings.TrimSpace(t.Nickname) || "" == strings.TrimSpace(t.Appid) {
 		err = errors.New("param `official_account's nickname | appid` empty")
-		retcode = utils.SOURCE_DATA_ILLEGAL
+		retcode = consts.ERROR_CODE__SOURCE_DATA__ILLEGAL
 		return
 	}
 	if _, err = (*o).Insert(t); err != nil {
 		err = errors.Wrap(err, "InsertOfficialAccountNoLock")
-		retcode = utils.DB_INSERT_ERROR
+		retcode = consts.ERROR_CODE__DB__INSERT
 		return
 	}
 	return
@@ -81,7 +106,7 @@ func init() {
 	orm.RegisterModel(new(OfficialAccounts))
 }
 
-func GetOfficialAccountBaseInfo(appid string) (offAcc *OfficialAccounts, retcode int, err error) {
+func GetOfficialAccountBaseInfo(platformAppid string, appid string) (offAcc *OfficialAccounts, retcode int, err error) {
 	var (
 		funcIdStr        string
 		num              int64
@@ -89,7 +114,9 @@ func GetOfficialAccountBaseInfo(appid string) (offAcc *OfficialAccounts, retcode
 	)
 	now := time.Now()
 	authorizer := new(Authorizer)
-	authorizer, retcode, err = GetOfficialAccountBaseInfoExternal(conf.WechatAuthTTL.ComponentAccessToken, appid)
+	in := &pb.OfficialAccountPlatform{}
+	conf.WxRelayServerClient.Call(fmt.Sprintf("%s.%s", "wx_relay_server", "GetOfficialAccountPlatformInfo"), in, in)
+	authorizer, retcode, err = GetOfficialAccountBaseInfoExternal(in.ComponentAccessToken, platformAppid, appid)
 	if err != nil {
 		err = errors.Wrap(err, "authorized get baseinfo failed.")
 		return
@@ -103,7 +130,7 @@ func GetOfficialAccountBaseInfo(appid string) (offAcc *OfficialAccounts, retcode
 	}
 	o := orm.NewOrm()
 	// 判断该公众号是否在系统中已存在
-	num, err = o.QueryTable((&OfficialAccounts{}).TableName()).Filter("appid", appid).Filter("status", utils.STATUS_VALID).All(&officialAccounts)
+	num, err = o.QueryTable((&OfficialAccounts{}).TableName()).Filter("appid", appid).Filter("status", consts.STATUS_VALID).All(&officialAccounts)
 	if err != nil {
 		err = errors.Wrap(err, "GetOfficialAccountBaseInfo")
 		return
@@ -129,7 +156,7 @@ func GetOfficialAccountBaseInfo(appid string) (offAcc *OfficialAccounts, retcode
 		QrcodeUrl:             authorizer.AuthorizerInfo.QrcodeUrl,
 		Appid:                 appid,
 		FuncIds:               funcIdStr,
-		Status:                utils.STATUS_VALID,
+		Status:                consts.STATUS_VALID,
 		UpdatedAt:             now,
 		CreatedAt:             now,
 	}
@@ -212,4 +239,116 @@ func GetAllOfficialAccounts(query map[string]string, fields []string, sortby []s
 		return ml, nil
 	}
 	return nil, err
+}
+
+// 1. 公众号与公司ID的绑定
+func BindingCompanyAndOfficialAccount(officialAccountId int, companyId int) (retcode int, err error) {
+	Logger.Info("[%v.%v] enter BindingCompanyAndOfficialAccount.", officialAccountId, companyId)
+	defer Logger.Info("[%v.%v] left BindingCompanyAndOfficialAccount.", officialAccountId, companyId)
+	o := orm.NewOrm()
+	now := time.Now()
+	officialAccount := &OfficialAccounts{
+		Id: officialAccountId,
+	}
+	if retcode, err = officialAccount.ReadOfficialAccountNoLock(&o); err != nil {
+		err = errors.Wrap(err, "BindingCompanyAndOfficialAccount")
+		return
+	}
+	// 如果已经绑定，则直接返回
+	if officialAccount.CompanyId > 0 {
+		return
+	}
+	officialAccount.UpdatedAt = now
+	officialAccount.CompanyId = companyId
+	if retcode, err = officialAccount.UpdatedOfficialAccountNoLock(&o); err != nil {
+		err = errors.Wrap(err, "BindingCompanyAndOfficialAccount")
+		return
+	}
+	return
+}
+
+type OfficialAccountSimpleInfo struct {
+	Id               int    `json:"id"`
+	IsStartWechatPay int16  `json:"is_start_wechat_pay"`
+	Name             string `json:"name"`
+}
+
+// 3. 获取公众号列表
+func GetOfficialAccounts(companyId int) (officialAccountSimpleInfos []*OfficialAccountSimpleInfo, retcode int, err error) {
+	Logger.Info("[%v] enter GetOfficialAccounts.", companyId)
+	defer Logger.Info("[%v] left GetOfficialAccounts.", companyId)
+	var (
+		officialAccountsPayParam *OfficialAccountsPayParams
+		officialAccounts         []*OfficialAccounts = []*OfficialAccounts{}
+		num                      int64
+		WechatPayStatus          int16 = consts.TYPE__STORAGE__UNABLED
+	)
+	officialAccountSimpleInfos = []*OfficialAccountSimpleInfo{}
+	o := orm.NewOrm()
+	num, err = o.QueryTable((&OfficialAccounts{}).TableName()).Filter("company_id", companyId).Filter("status", consts.STATUS_VALID).All(&officialAccounts)
+	if err != nil {
+		err = errors.Wrap(err, "GetOfficialAccounts")
+		retcode = consts.ERROR_CODE__DB__READ
+		return
+	}
+	if num > 0 {
+		for index := 0; index < int(num); index++ {
+			// 1. 获取公众号ID、名称
+			// 2. 获取是否公众号已开启支付
+			officialAccountsPayParam, retcode, err = GetOfficialAccountPayParamByOfficialAccountId(officialAccounts[index].Id)
+			if err != nil {
+				err = errors.Wrap(err, "GetOfficialAccounts")
+				return
+			}
+			if officialAccountsPayParam != nil && officialAccountsPayParam.MchId != "" && officialAccountsPayParam.Appkey != "" {
+				WechatPayStatus = consts.TYPE_PAY_STATUS__WECHAT__STARTED
+			} else {
+				WechatPayStatus = consts.TYPE__STORAGE__UNABLED
+			}
+			officialAccountSimpleInfos = append(officialAccountSimpleInfos, &OfficialAccountSimpleInfo{
+				Id:               officialAccounts[index].Id,
+				Name:             officialAccounts[index].Nickname,
+				IsStartWechatPay: WechatPayStatus,
+			})
+		}
+	}
+	return
+}
+
+// 4. 通过公司ID，获取公众号信息
+func GetOfficialAccountByCompanyId(companyId int) (officialAccount *OfficialAccounts, retcode int, err error) {
+	Logger.Info("[%v] enter GetOfficialAccountByCompanyId.", companyId)
+	defer Logger.Info("[%v] left GetOfficialAccountByCompanyId.", companyId)
+	var (
+		officialAccounts []*OfficialAccounts
+		num              int64
+	)
+	o := orm.NewOrm()
+	num, err = o.QueryTable((&OfficialAccounts{}).TableName()).Filter("company_id", companyId).Filter("status", consts.STATUS_VALID).All(&officialAccounts)
+	if err != nil {
+		err = errors.Wrap(err, "GetOfficialAccountByCompanyId")
+		retcode = consts.ERROR_CODE__DB__READ
+		return
+	}
+	if num > 0 {
+		officialAccount = officialAccounts[0]
+	}
+	return
+}
+
+func getOfficialAccountIdByCompanyId(companyId int) (officialAccountId int, retcode int, err error) {
+	Logger.Info("[%v] enter getOfficialAccountIdByCompanyId.", companyId)
+	defer Logger.Info("[%v] left getOfficialAccountIdByCompanyId.", companyId)
+	var (
+		officialAccount *OfficialAccounts
+	)
+	officialAccount, retcode, err = GetOfficialAccountByCompanyId(companyId)
+	if err != nil {
+		err = errors.Wrap(err, "getOfficialAccountIdByCompanyId")
+		return
+	}
+	if officialAccount != nil {
+		return officialAccount.Id, 0, nil
+	}
+	return
 }

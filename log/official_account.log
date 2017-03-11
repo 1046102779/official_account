@@ -127,3 +127,5 @@
 2017/01/03 14:34:04 [D] [pay.go:118] Get unified order:: request:: [map[time_expire: product_id: sign:72476145F9BF8E5E155B8308B2DDDFDF device_info: attach:101 goods_tag: notify_url:http://120.77.65.193:40011/v1/wechats/notification trade_type:NATIVE nonce_str:nonce_str spbill_create_ip:127.0.0.1 body:进销存系统短信充值平台 mch_id:1399659602 total_fee:30 time_start: openid: appid:wx6f18d544edaab59c out_trade_no:20170103143404-6610]]
 2017/01/03 14:34:04 [I] [pay.go:133] [1] left unifiedOrder.
 2017/01/03 14:34:04 [I] [grpc_server.go:88] [20170103143404-6610] left GetSmsRechargePayNativeParams.
+2017/01/17 23:07:46 [E] [official_accounts.go:23] please login homepage
+2017/01/17 23:11:10 [E] [official_accounts.go:23] please login homepage

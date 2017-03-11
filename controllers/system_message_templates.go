@@ -3,7 +3,7 @@ package controllers
 import (
 	"time"
 
-	utils "github.com/1046102779/common"
+	"github.com/1046102779/common/consts"
 	. "github.com/1046102779/official_account/logger"
 	"github.com/1046102779/official_account/models"
 	"github.com/astaxie/beego"
@@ -44,11 +44,11 @@ func (t *MessageTemplatesController) GetMessageTemplates() {
 	pageIndex, _ := t.GetInt("page_index")
 	pageSize, _ := t.GetInt("page_size")
 	o := orm.NewOrm()
-	count, err := o.QueryTable((&models.SystemMessageTemplates{}).TableName()).Filter("status", utils.STATUS_VALID).Count()
+	count, err := o.QueryTable((&models.SystemMessageTemplates{}).TableName()).Filter("status", consts.STATUS_VALID).Count()
 	if err != nil {
 		Logger.Error(err.Error())
 		t.Data["json"] = map[string]interface{}{
-			"err_code": utils.DB_READ_ERROR,
+			"err_code": consts.ERROR_CODE__DB__READ,
 			"err_msg":  errors.Cause(err).Error(),
 		}
 		t.ServeJSON()
@@ -114,7 +114,7 @@ func (t *MessageTemplatesController) LogicDeleteSystemMessageTemplate() {
 		return
 	}
 	if template.Code != "" {
-		template.Status = utils.STATUS_DELETED
+		template.Status = consts.STATUS_DELETED
 		template.UpdatedAt = now
 		if retcode, err := template.UpdateSystemMessageTemplatesNoLock(&o); err != nil {
 			Logger.Error(err.Error())

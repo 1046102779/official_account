@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	utils "github.com/1046102779/common"
+	"github.com/1046102779/common/consts"
 	. "github.com/1046102779/official_account/logger"
 	"github.com/1046102779/official_account/models"
 	"github.com/astaxie/beego"
@@ -36,18 +36,18 @@ func (t *OfficialAccountIndustryCodesController) GetOfficialAccountIndustry() {
 		err := errors.New("param `:id` empty")
 		Logger.Error(err.Error())
 		t.Data["json"] = map[string]interface{}{
-			"err_code": utils.SOURCE_DATA_ILLEGAL,
+			"err_code": consts.ERROR_CODE__SOURCE_DATA__ILLEGAL,
 			"err_msg":  errors.Cause(err).Error(),
 		}
 		t.ServeJSON()
 		return
 	}
 	o := orm.NewOrm()
-	num, err := o.QueryTable((&models.OfficialAccountIndustryCodes{}).TableName()).Filter("official_account_id", id).Filter("status", utils.STATUS_VALID).All(&officialAccountIndustryCodes)
+	num, err := o.QueryTable((&models.OfficialAccountIndustryCodes{}).TableName()).Filter("official_account_id", id).Filter("status", consts.STATUS_VALID).All(&officialAccountIndustryCodes)
 	if err != nil {
 		Logger.Error(err.Error())
 		t.Data["json"] = map[string]interface{}{
-			"err_code": utils.DB_READ_ERROR,
+			"err_code": consts.ERROR_CODE__DB__READ,
 			"err_msg":  errors.Cause(err).Error(),
 		}
 		t.ServeJSON()
@@ -131,7 +131,7 @@ func (t *OfficialAccountIndustryCodesController) GetOfficialAccountIndustry() {
 				OfficialAccountId: id,
 				IndustryId1:       industryId1,
 				IndustryId2:       industryId2,
-				Status:            utils.STATUS_VALID,
+				Status:            consts.STATUS_VALID,
 				UpdatedAt:         now,
 				CreatedAt:         now,
 			}
@@ -173,7 +173,7 @@ func (t *OfficialAccountIndustryCodesController) UpdateOfficialAccountIndustryCo
 		err := errors.New("param `:id` empty")
 		Logger.Error(err.Error())
 		t.Data["json"] = map[string]interface{}{
-			"err_code": utils.SOURCE_DATA_ILLEGAL,
+			"err_code": consts.ERROR_CODE__SOURCE_DATA__ILLEGAL,
 			"err_msg":  errors.Cause(err).Error(),
 		}
 		t.ServeJSON()
@@ -182,7 +182,7 @@ func (t *OfficialAccountIndustryCodesController) UpdateOfficialAccountIndustryCo
 	if err := jsoniter.Unmarshal(t.Ctx.Input.RequestBody, industryInfo); err != nil {
 		Logger.Error(err.Error())
 		t.Data["json"] = map[string]interface{}{
-			"err_code": utils.JSON_PARSE_FAILED,
+			"err_code": consts.ERROR_CODE__JSON__PARSE_FAILED,
 			"err_msg":  errors.Cause(err).Error(),
 		}
 		t.ServeJSON()
@@ -192,7 +192,7 @@ func (t *OfficialAccountIndustryCodesController) UpdateOfficialAccountIndustryCo
 		err := errors.New("param `industry_id1 | industry_id2` empty")
 		Logger.Error(err.Error())
 		t.Data["json"] = map[string]interface{}{
-			"err_code": utils.SOURCE_DATA_ILLEGAL,
+			"err_code": consts.ERROR_CODE__SOURCE_DATA__ILLEGAL,
 			"err_msg":  errors.Cause(err).Error(),
 		}
 		t.ServeJSON()

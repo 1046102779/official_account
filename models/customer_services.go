@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/1046102779/common/httpRequest"
+	pb "github.com/1046102779/igrpc"
 	"github.com/1046102779/official_account/conf"
 	. "github.com/1046102779/official_account/logger"
-	"github.com/pkg/errors"
 )
 
 type CustomerServices struct{}
@@ -33,14 +33,10 @@ func (t *CustomerServices) SendMessage(appid string, touser string, msgType stri
 		},
 	}
 	fmt.Println("send message info: ", *message)
-	if _, ok := conf.WechatAuthTTL.AuthorizerMap[appid]; !ok {
-		err := errors.New("param `appid` not exists in maps")
-		Logger.Error(err.Error())
-		return
-	}
-	token := conf.WechatAuthTTL.AuthorizerMap[appid].AuthorizerAccessToken
-	if token != "" {
-		httpStr := fmt.Sprintf("https://api.weixin.qq.com/cgi-bin/message/custom/send?access_token=%s", token)
+	in := &pb.OfficialAccount{Appid: appid}
+	conf.WxRelayServerClient.Call(fmt.Sprintf("%s.%s", "wx_relay_server", "GetOfficialAccountInfo"), in, in)
+	if in.AuthorizerAccessToken != "" {
+		httpStr := fmt.Sprintf("https://api.weixin.qq.com/cgi-bin/message/custom/send?access_token=%s", in.AuthorizerAccessToken)
 		bodyData, _ := json.Marshal(*message)
 		retBody, _ := httpRequest.HttpPostBody(httpStr, bodyData)
 		fmt.Println("result: ", string(retBody))

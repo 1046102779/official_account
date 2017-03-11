@@ -8,7 +8,7 @@
 package routers
 
 import (
-	"github.com/1046102779/official_account/controllers"
+	"git.kissdata.com/ycfm/official_account/controllers"
 
 	"github.com/astaxie/beego"
 )

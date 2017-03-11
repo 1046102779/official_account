@@ -1,11 +1,9 @@
 package models
 
 import (
-	"reflect"
-	"strings"
 	"time"
 
-	utils "github.com/1046102779/common"
+	"github.com/1046102779/common/consts"
 	. "github.com/1046102779/official_account/logger"
 	"github.com/pkg/errors"
 
@@ -40,7 +38,7 @@ func (t *SystemMessageTemplates) GetSystemMessageTemplateNoLock(o *orm.Ormer) (r
 	}
 	if err = (*o).Read(t); err != nil {
 		err = errors.Wrap(err, "GetSystemMessageTemplateNoLock")
-		retcode = utils.DB_READ_ERROR
+		retcode = consts.ERROR_CODE__DB__READ
 		return
 	}
 	return
@@ -55,7 +53,7 @@ func (t *SystemMessageTemplates) UpdateSystemMessageTemplatesNoLock(o *orm.Ormer
 	}
 	if _, err = (*o).Update(t); err != nil {
 		err = errors.Wrap(err, "UpdateSystemMessageTemplatesNoLock")
-		retcode = utils.DB_UPDATE_ERROR
+		retcode = consts.ERROR_CODE__DB__UPDATE
 		return
 	}
 	return
@@ -71,88 +69,34 @@ func GetSystemMessageTemplatesNoLock(pageIndex int, pageSize int, o *orm.Ormer) 
 	messageTemplates = []SystemMessageTemplates{}
 	if o == nil {
 		err = errors.New("param `orm.Ormer` ptr empty")
-		retcode = utils.SOURCE_DATA_ILLEGAL
+		retcode = consts.ERROR_CODE__SOURCE_DATA__ILLEGAL
 		return
 	}
-	_, err = (*o).QueryTable((&SystemMessageTemplates{}).TableName()).Filter("status", utils.STATUS_VALID).Limit(pageSize, pageIndex*pageSize).All(&messageTemplates)
+	_, err = (*o).QueryTable((&SystemMessageTemplates{}).TableName()).Filter("status", consts.STATUS_VALID).Limit(pageSize, pageIndex*pageSize).All(&messageTemplates)
 	if err != nil {
 		err = errors.Wrap(err, "GetSystemMessageTemplatesNoLock")
-		retcode = utils.DB_READ_ERROR
+		retcode = consts.ERROR_CODE__DB__READ
 		return
 	}
 	return
 }
 
-// GetAllMessageTemplates retrieves all MessageTemplates matches certain condition. Returns empty list if
-// no records exist
-func GetAllSystemMessageTemplates(query map[string]string, fields []string, sortby []string, order []string,
-	offset int64, limit int64) (ml []interface{}, err error) {
+func getTemplateIdByName(name string) (templateId int, retcode int, err error) {
+	Logger.Info("[%v] enter getTemplateIdByName.", name)
+	defer Logger.Info("[%v] left getTemplateIdByName.", name)
+	var (
+		templates []*SystemMessageTemplates
+		num       int64 = 0
+	)
 	o := orm.NewOrm()
-	qs := o.QueryTable(new(SystemMessageTemplates))
-	// query k=v
-	for k, v := range query {
-		// rewrite dot-notation to Object__Attribute
-		k = strings.Replace(k, ".", "__", -1)
-		qs = qs.Filter(k, v)
+	num, err = o.QueryTable((&SystemMessageTemplates{}).TableName()).Filter("title", name).Filter("status", consts.STATUS_VALID).All(&templates)
+	if err != nil {
+		err = errors.Wrap(err, "getTemplateIdByName")
+		retcode = consts.ERROR_CODE__DB__READ
+		return
 	}
-	// order by:
-	var sortFields []string
-	if len(sortby) != 0 {
-		if len(sortby) == len(order) {
-			// 1) for each sort field, there is an associated order
-			for i, v := range sortby {
-				orderby := ""
-				if order[i] == "desc" {
-					orderby = "-" + v
-				} else if order[i] == "asc" {
-					orderby = v
-				} else {
-					return nil, errors.New("Error: Invalid order. Must be either [asc|desc]")
-				}
-				sortFields = append(sortFields, orderby)
-			}
-			qs = qs.OrderBy(sortFields...)
-		} else if len(sortby) != len(order) && len(order) == 1 {
-			// 2) there is exactly one order, all the sorted fields will be sorted by this order
-			for _, v := range sortby {
-				orderby := ""
-				if order[0] == "desc" {
-					orderby = "-" + v
-				} else if order[0] == "asc" {
-					orderby = v
-				} else {
-					return nil, errors.New("Error: Invalid order. Must be either [asc|desc]")
-				}
-				sortFields = append(sortFields, orderby)
-			}
-		} else if len(sortby) != len(order) && len(order) != 1 {
-			return nil, errors.New("Error: 'sortby', 'order' sizes mismatch or 'order' size is not 1")
-		}
-	} else {
-		if len(order) != 0 {
-			return nil, errors.New("Error: unused 'order' fields")
-		}
+	if num > 0 {
+		templateId = templates[0].Id
 	}
-
-	var l []SystemMessageTemplates
-	qs = qs.OrderBy(sortFields...)
-	if _, err = qs.Limit(limit, offset).All(&l, fields...); err == nil {
-		if len(fields) == 0 {
-			for _, v := range l {
-				ml = append(ml, v)
-			}
-		} else {
-			// trim unused fields
-			for _, v := range l {
-				m := make(map[string]interface{})
-				val := reflect.ValueOf(v)
-				for _, fname := range fields {
-					m[fname] = val.FieldByName(fname).Interface()
-				}
-				ml = append(ml, m)
-			}
-		}
-		return ml, nil
-	}
-	return nil, err
+	return
 }

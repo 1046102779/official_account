@@ -3,7 +3,7 @@ package controllers
 import (
 	"encoding/json"
 
-	utils "github.com/1046102779/common"
+	"github.com/1046102779/common/consts"
 	. "github.com/1046102779/official_account/logger"
 	"github.com/1046102779/official_account/models"
 	"github.com/astaxie/beego"
@@ -30,7 +30,7 @@ func (t *AccountMessageSendRecordsController) SendAccountMessage() {
 	if err := json.Unmarshal(t.Ctx.Input.RequestBody, messageInfo); err != nil {
 		Logger.Error(err.Error())
 		t.Data["json"] = map[string]interface{}{
-			"err_code": utils.JSON_PARSE_FAILED,
+			"err_code": consts.ERROR_CODE__JSON__PARSE_FAILED,
 			"err_msg":  errors.Cause(err).Error(),
 		}
 		t.ServeJSON()
