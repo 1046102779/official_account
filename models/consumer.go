@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/1046102779/common/consts"
-	"github.com/1046102779/common/utils"
-	pb "github.com/1046102779/igrpc"
+	"github.com/1046102779/official_account/common/consts"
+	"github.com/1046102779/official_account/common/utils"
 	"github.com/1046102779/official_account/conf"
+	pb "github.com/1046102779/official_account/igrpc"
 	. "github.com/1046102779/official_account/logger"
 
 	"github.com/pkg/errors"

@@ -1,0 +1,38 @@
+package consts
+
+const (
+	SUCCESS         = 0   // status 状态
+	STATUS_VALID    = 10  // 账号有效或者已启用
+	STATUS_INVALID  = -10 // 临时
+	STATUS_INACTIVE = -10 // 账号未启用
+	STATUS_DELETED  = -20 // 账号删除
+	STATUS_BLOCKED  = -30 // 账号冻结
+
+	ERROR_CODE__PARAM__ILLEGAL = 1101
+
+	WECHAT_MESSAGE_NOT_EXIST = 3021
+
+	// etcd相关操作错误码
+	ETCD_CREATE_DIR_ERROR = 3001
+	ETCD_CREATE_KEY_ERROR = 3002
+	ETCD_READ_KEY_ERROR   = 3003
+
+	// http
+	ERROR_CODE__SOURCE_DATA__ILLEGAL      = 1101 // 外部传入参数错误
+	ERROR_CODE__GRPC__FAILED              = 1102 // grpc 调用失败
+	ERROR_CODE__HTTP__CALL_FAILD_EXTERNAL = 1103 // http外部调用失败
+	ERROR_CODE__HTTP__CALL_FAILD_INTERNAL = 1104 // http内部调用失败
+	ERROR_CODE__JSON__PARSE_FAILED        = 1105 // JSON解析失败
+	ERROR_CODE__HTTP__INPUT_EMPTY         = 1106
+
+	// database
+	ERROR_CODE__DB__INSERT                      = 1001
+	ERROR_CODE__DB__READ                        = 1002
+	ERROR_CODE__DB__UPDATE                      = 1003
+	ERROR_CODE__DB__NO_ROW                      = 1007
+	ERROR_CODE__DB__UNEXPECTED                  = 1008
+	ERROR_CODE__DB__TRANSACTION_BEGIN_FAILED    = 1009
+	ERROR_CODE__DB__TRANSACTION_COMMIT_FAILED   = 1010
+	ERROR_CODE__DB__UPDATE_UNEXPECTED           = 1011
+	ERROR_CODE__DB__TRANSACTION_ROLLBACK_FAILED = 1010
+)

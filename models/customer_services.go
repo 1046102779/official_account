@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/1046102779/common/httpRequest"
-	pb "github.com/1046102779/igrpc"
+	"github.com/1046102779/official_account/common/httpRequest"
 	"github.com/1046102779/official_account/conf"
+	pb "github.com/1046102779/official_account/igrpc"
 	. "github.com/1046102779/official_account/logger"
 )
 

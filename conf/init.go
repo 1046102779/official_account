@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/1046102779/common/utils"
+	"github.com/1046102779/official_account/common/utils"
 
 	"github.com/astaxie/beego"
 	"github.com/astaxie/beego/orm"

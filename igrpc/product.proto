@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package igrpc;
+
+message ColorPatternRelationship {
+    int64 Id = 1;
+    string Name = 2;
+    string Code = 3;
+    string ColorName = 4;
+    string ColorCode=5;
+    int64 CompanyId = 6;
+    int64 FabricPatternId = 7;
+    int64 ColorId = 9;
+    int64 Amount = 10; // 面料-颜色的数量
+    int64 Weight = 11; // 面料-颜色的总重量
+    int64 UnitType = 12; // 面料单位： 匹/米
+}
+
+message ColorPatternRelationshipsResp {
+    repeated ColorPatternRelationship ColorPatternRelationships= 1;
+}
+
+message FabricPattern {
+    int64 Id = 1;
+    string Name=2;
+    string Code =3;
+    string Breadth=4;
+    int64 BreadthErrorRange=5;
+    string Gsm=6;
+    int64 GsmErrorRange = 7;
+    string WeavingComposition = 8;
+    int64 LowPricePk = 9;
+    int64 RefPricePk = 10;
+    int64 SellingPricePk =11;
+    int64 LowPricePm = 12;
+    int64 RefPricePm = 13;
+    int64 SellingPricePm = 14;
+    string Desc = 15;
+    string WeavingStructure = 16;
+    string PaperTubeSpecifications = 17;
+}
+
+message ColorInfo {
+    int64 Id  = 1;
+    string Code = 2;
+    string Name = 3;
+    int64 CompanyId = 4;
+}
+
+message Colors {
+    repeated ColorInfo Colors = 1;
+}
+
+message FabricPatternInfo {
+    int64 Id = 1;
+    string Code = 2;
+    string Name = 3;
+}

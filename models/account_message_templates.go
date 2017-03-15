@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/1046102779/common/consts"
-	pb "github.com/1046102779/igrpc"
+	"github.com/1046102779/official_account/common/consts"
 	"github.com/1046102779/official_account/conf"
+	pb "github.com/1046102779/official_account/igrpc"
 	. "github.com/1046102779/official_account/logger"
 	"github.com/pkg/errors"
 

@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package igrpc;
+
+import "common.proto";
+
+service SmsGrpc {
+    rpc MatchMobileVerificationCode(KeyValue) returns (Bool);
+}
+
+message CodeRequest {
+    string Mobile = 1;
+    string Code = 2;
+}
+
+message CodeReply {
+    int32  RetCode = 1;
+    string ErrMsg = 2;
+}
+
+message MobileInfo {
+    string Mobile = 1;
+}
+
+message ContentInfo {
+    string Content = 1;
+}
+
+message SmsRequest {
+    repeated MobileInfo  Mobiles = 1;
+    repeated ContentInfo Contents = 2;
+}
+
+// 短信充值订单信息更新
+message SmsRechargeOrderInfo {
+    string OutTradeNo =1; // 第三方订单号
+    int64 Money =2; // 实际支付金额，单位：分
+    string TransactionId = 3; // 微信公众号平台支付ID
+}

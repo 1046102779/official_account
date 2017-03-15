@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	pb "github.com/1046102779/igrpc"
+	pb "github.com/1046102779/official_account/igrpc"
 
-	"github.com/1046102779/common/consts"
+	"github.com/1046102779/official_account/common/consts"
 	"github.com/1046102779/official_account/conf"
 	. "github.com/1046102779/official_account/logger"
 	"github.com/1046102779/official_account/models"

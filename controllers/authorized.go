@@ -10,12 +10,12 @@ import (
 	"net/url"
 	"strings"
 
-	"git.kissdata.com/ycfm/common/consts"
-	"git.kissdata.com/ycfm/common/utils"
-	pb "git.kissdata.com/ycfm/igrpc"
-	"git.kissdata.com/ycfm/official_account/conf"
-	. "git.kissdata.com/ycfm/official_account/logger"
-	"git.kissdata.com/ycfm/official_account/models"
+	"github.com/1046102779/official_account/common/consts"
+	"github.com/1046102779/official_account/common/utils"
+	"github.com/1046102779/official_account/conf"
+	pb "github.com/1046102779/official_account/igrpc"
+	. "github.com/1046102779/official_account/logger"
+	"github.com/1046102779/official_account/models"
 	"github.com/astaxie/beego"
 	"github.com/pkg/errors"
 )

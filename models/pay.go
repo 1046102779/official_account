@@ -3,8 +3,8 @@ package models
 import (
 	"fmt"
 
-	"github.com/1046102779/common/consts"
-	. "github.com/1046102779/common/utils"
+	"github.com/1046102779/official_account/common/consts"
+	. "github.com/1046102779/official_account/common/utils"
 	"github.com/1046102779/official_account/conf"
 	. "github.com/1046102779/official_account/logger"
 	"github.com/astaxie/beego/orm"

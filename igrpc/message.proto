@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package igrpc;
+
+message SaleOrderTemplateMessage {
+	int64 SaleOrderId= 1;
+	int64 SaleOrderItemId =2;
+	int64  Type = 3;
+}
+
+message SmsMessage  {
+	string Mobile  = 1;
+	string Content = 2;
+}
+
+message EmailMessage {
+	string Email    =1;
+	string Password  =2;
+	string Title    =3;
+	string Content  =4;
+}
+
+message Message {
+    bytes Bts = 1;
+    string Topic = 2;
+}

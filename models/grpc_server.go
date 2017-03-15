@@ -18,8 +18,8 @@ import (
 	"github.com/astaxie/beego/orm"
 	"github.com/chanxuehong/wechat/mch"
 
-	"github.com/1046102779/common/consts"
-	pb "github.com/1046102779/igrpc"
+	"github.com/1046102779/official_account/common/consts"
+	pb "github.com/1046102779/official_account/igrpc"
 	. "github.com/1046102779/official_account/logger"
 )
 
