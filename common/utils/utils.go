@@ -22,8 +22,8 @@ import (
 	"strings"
 	"time"
 
-	"git.kissdata.com/ycfm/common/consts"
-	"git.kissdata.com/ycfm/common/slicelement"
+	"github.com/1046102779/official_account/common/consts"
+	"github.com/1046102779/slicelement"
 	"github.com/pkg/errors"
 	"github.com/tealeg/xlsx"
 )
