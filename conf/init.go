@@ -40,6 +40,8 @@ var (
 	DBMaxIdle int
 	DBMaxConn int
 	DBDebug   bool
+
+	WechatOpenPlatformTestFeatureFlag bool = false
 )
 
 func initEtcdClient() {
@@ -124,6 +126,11 @@ func init() {
 	initEtcdClient()
 	// 初始化DB连接
 	initDBConn()
+
+	WechatOpenPlatformTestFeature := strings.TrimSpace(beego.AppConfig.String("wechat::wechat_open_platform_test_feture"))
+	if WechatOpenPlatformTestFeature == "ON" {
+		WechatOpenPlatformTestFeatureFlag = true
+	}
 
 	// 获取RPC client
 	if name, exist = utils.FindServer("sms", Servers); !exist {

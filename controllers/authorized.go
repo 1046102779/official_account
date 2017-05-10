@@ -72,19 +72,22 @@ func (t *Authorized) GetComponentLoginPage() {
 // @router /authorization/code [GET]
 func (t *Authorized) GetAuthorizedCode() {
 	var (
-		offAcc    *models.OfficialAccounts = new(models.OfficialAccounts)
-		companyId int                      = 0
+		offAcc                  *models.OfficialAccounts = new(models.OfficialAccounts)
+		companyId, retCode, int                          = 1, 0
+		err                     error
 	)
-	// 获取登录态的公司ID
-	companyId, retcode, err := utils.GetCompanyIdFromHeader(t.Ctx.Request)
-	if err != nil {
-		Logger.Error(err.Error())
-		t.Data["json"] = map[string]interface{}{
-			"err_code": retcode,
-			"err_msg":  errors.Cause(err).Error(),
+	if !conf.WechatOpenPlatformTestFeatureFlag {
+		// 获取登录态的公司ID
+		companyId, retCode, err = utils.GetCompanyIdFromHeader(t.Ctx.Request)
+		if err != nil {
+			Logger.Error(err.Error())
+			t.Data["json"] = map[string]interface{}{
+				"err_code": retCode,
+				"err_msg":  errors.Cause(err).Error(),
+			}
+			t.ServeJSON()
+			return
 		}
-		t.ServeJSON()
-		return
 	}
 	code := t.GetString("auth_code")
 	if "" == strings.TrimSpace(code) {
@@ -101,11 +104,11 @@ func (t *Authorized) GetAuthorizedCode() {
 	in := &pb.OfficialAccountPlatform{}
 	conf.WxRelayServerClient.Call(fmt.Sprintf("%s.%s", "wx_relay_server", "GetOfficialAccountPlatformInfo"), in, in)
 	platformAppid := in.Appid
-	authorizedInfoResp, retcode, err := models.GetAuthorierTokenInfo(in.ComponentAccessToken, in.Appid, code)
+	authorizedInfoResp, retCode, err := models.GetAuthorierTokenInfo(in.ComponentAccessToken, in.Appid, code)
 	if err != nil {
 		Logger.Error(err.Error())
 		t.Data["json"] = map[string]interface{}{
-			"err_code": retcode,
+			"err_code": retCode,
 			"err_msg":  errors.Cause(err).Error(),
 		}
 		t.ServeJSON()
@@ -129,11 +132,11 @@ func (t *Authorized) GetAuthorizedCode() {
 		conf.WxRelayServerClient.Call(fmt.Sprintf("%s.%s", "wx_relay_server", "StoreOfficialAccountInfo"), in, in)
 	}
 	// 获取公众号基本信息
-	offAcc, retcode, err = models.GetOfficialAccountBaseInfo(platformAppid, authorizedInfoResp.AuthorizedInfo.Appid)
+	offAcc, retCode, err = models.GetOfficialAccountBaseInfo(platformAppid, authorizedInfoResp.AuthorizedInfo.Appid)
 	if err != nil {
 		Logger.Error(err.Error())
 		t.Data["json"] = map[string]interface{}{
-			"err_code": retcode,
+			"err_code": retCode,
 			"err_msg":  errors.Cause(err).Error(),
 		}
 		t.ServeJSON()
@@ -142,11 +145,11 @@ func (t *Authorized) GetAuthorizedCode() {
 	fmt.Println("authorizedInfoResp: ", *authorizedInfoResp)
 	// 公众号与公司ID的绑定
 
-	retcode, err = models.BindingCompanyAndOfficialAccount(offAcc.Id, companyId)
+	retCode, err = models.BindingCompanyAndOfficialAccount(offAcc.Id, companyId)
 	if err != nil {
 		Logger.Error(err.Error())
 		t.Data["json"] = map[string]interface{}{
-			"err_code": retcode,
+			"err_code": retCode,
 			"err_msg":  errors.Cause(err).Error(),
 		}
 		t.ServeJSON()
