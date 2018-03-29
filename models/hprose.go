@@ -4,8 +4,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/1046102779/common/consts"
 	"github.com/1046102779/common/types"
-	"github.com/1046102779/official_account/common/consts"
 	. "github.com/1046102779/official_account/logger"
 	"github.com/astaxie/beego/orm"
 	"gopkg.in/chanxuehong/wechat.v2/mch/core"

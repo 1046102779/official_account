@@ -4,7 +4,7 @@
 package controllers
 
 import (
-	"github.com/1046102779/official_account/common/utils"
+	"github.com/1046102779/common/utils"
 	. "github.com/1046102779/official_account/logger"
 	"github.com/1046102779/official_account/models"
 	"github.com/astaxie/beego"
