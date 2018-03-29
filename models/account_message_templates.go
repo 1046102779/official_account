@@ -1,12 +1,11 @@
 package models
 
 import (
-	"fmt"
 	"time"
 
+	"github.com/1046102779/common/types"
 	"github.com/1046102779/official_account/common/consts"
 	"github.com/1046102779/official_account/conf"
-	pb "github.com/1046102779/official_account/igrpc"
 	. "github.com/1046102779/official_account/logger"
 	"github.com/pkg/errors"
 
@@ -207,7 +206,6 @@ func LogicDeleteAccountMessageTemplatesNoLocks(systemMessageTemplateId int, o *o
 		accountMessageTemplates []AccountMessageTemplates = []AccountMessageTemplates{}
 		weMessageTemplate       *WeMessageTemplate        = new(WeMessageTemplate)
 		offAcc                  *OfficialAccounts
-		token                   string
 		num                     int64
 	)
 	now := time.Now()
@@ -243,11 +241,15 @@ func LogicDeleteAccountMessageTemplatesNoLocks(systemMessageTemplateId int, o *o
 			return
 		}
 		if offAcc.Appid != "" {
-			in := &pb.OfficialAccount{Appid: offAcc.Appid}
-			conf.WxRelayServerClient.Call(fmt.Sprintf("%s.%s", "wx_relay_server", "GetOfficialAccountInfo"), in, in)
-			token = in.AuthorizerAccessToken
-			retcode, err = weMessageTemplate.DeleteMessageTemplate(token, accountMessageTemplates[index].TemplateId)
-			if err != nil {
+			var oa *types.OfficialAccount
+			if oa, err = conf.WRServerRPC.GetOfficialAccountInfo(offAcc.Appid); err != nil {
+				err = errors.Wrap(err, "rpc get official account failed.")
+				return
+			}
+			if retcode, err = weMessageTemplate.DeleteMessageTemplate(
+				oa.AuthorizerAccessToken,
+				accountMessageTemplates[index].TemplateId,
+			); err != nil {
 				err = errors.Wrap(err, "LogicDeleteAccountMessageTemplatesNoLocks")
 				return
 			}

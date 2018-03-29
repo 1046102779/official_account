@@ -10,10 +10,10 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/1046102779/common/types"
 	"github.com/1046102779/official_account/common/consts"
 	"github.com/1046102779/official_account/common/utils"
 	"github.com/1046102779/official_account/conf"
-	pb "github.com/1046102779/official_account/igrpc"
 	. "github.com/1046102779/official_account/logger"
 	"github.com/1046102779/official_account/models"
 	"github.com/astaxie/beego"
@@ -41,13 +41,13 @@ type XmlResp struct {
 // </xml>
 // @router / [POST]
 func (t *Authorized) ComponentVerifyTicket() {
-	in := &pb.ComponentVerifyTicket{
+	cvt := &types.ComponentVerifyTicket{
 		TimeStamp: t.GetString("timestamp"),
 		Nonce:     t.GetString("nonce"),
 		MsgSign:   t.GetString("msg_signature"),
 		Bts:       t.Ctx.Input.RequestBody,
 	}
-	conf.WxRelayServerClient.Call(fmt.Sprintf("%s.%s", "wx_relay_server", "RefreshComponentVerifyTicket"), in, in)
+	conf.WRServerRPC.RefreshComponentVerifyTicket(cvt)
 	t.Ctx.Output.Body([]byte("success"))
 	return
 }
@@ -56,9 +56,14 @@ func (t *Authorized) ComponentVerifyTicket() {
 // @router /authorization/loginpage [GET]
 func (t *Authorized) GetComponentLoginPage() {
 	redirectUrl := t.GetString("callback_url")
-	in := &pb.OfficialAccountPlatform{}
-	conf.WxRelayServerClient.Call(fmt.Sprintf("%s.%s", "wx_relay_server", "GetOfficialAccountPlatformInfo"), in, in)
-	httpStr := fmt.Sprintf("https://mp.weixin.qq.com/cgi-bin/componentloginpage?component_appid=%s&pre_auth_code=%s&redirect_uri=%s", in.Appid, in.PreAuthCode, url.QueryEscape(redirectUrl))
+	var oap *types.OfficialAccountPlatform
+	oap, _ = conf.WRServerRPC.GetOfficialAccountPlatformInfo()
+	httpStr := fmt.Sprintf(
+		"https://mp.weixin.qq.com/cgi-bin/componentloginpage?component_appid=%s&pre_auth_code=%s&redirect_uri=%s",
+		oap.Appid,
+		oap.PreAuthCode,
+		url.QueryEscape(redirectUrl),
+	)
 	t.Data["json"] = map[string]interface{}{
 		"err_code": 0,
 		"err_msg":  "",
@@ -72,9 +77,9 @@ func (t *Authorized) GetComponentLoginPage() {
 // @router /authorization/code [GET]
 func (t *Authorized) GetAuthorizedCode() {
 	var (
-		offAcc                  *models.OfficialAccounts = new(models.OfficialAccounts)
-		companyId, retCode, int                          = 1, 0
-		err                     error
+		offAcc             *models.OfficialAccounts = new(models.OfficialAccounts)
+		companyId, retCode int                      = 1, 0
+		err                error
 	)
 	if !conf.WechatOpenPlatformTestFeatureFlag {
 		// 获取登录态的公司ID
@@ -100,11 +105,18 @@ func (t *Authorized) GetAuthorizedCode() {
 		t.ServeJSON()
 		return
 	}
-	// ::TODO get
-	in := &pb.OfficialAccountPlatform{}
-	conf.WxRelayServerClient.Call(fmt.Sprintf("%s.%s", "wx_relay_server", "GetOfficialAccountPlatformInfo"), in, in)
-	platformAppid := in.Appid
-	authorizedInfoResp, retCode, err := models.GetAuthorierTokenInfo(in.ComponentAccessToken, in.Appid, code)
+	var oap *types.OfficialAccountPlatform
+	if oap, err = conf.WRServerRPC.GetOfficialAccountPlatformInfo(); err != nil {
+		Logger.Error(err.Error())
+		t.Data["json"] = map[string]interface{}{
+			"err_code": consts.ERROR_CODE__GRPC__FAILED,
+			"err_msg":  errors.Cause(err).Error(),
+		}
+		t.ServeJSON()
+		return
+	}
+	platformAppid := oap.Appid
+	authorizedInfoResp, retCode, err := models.GetAuthorierTokenInfo(oap.ComponentAccessToken, oap.Appid, code)
 	if err != nil {
 		Logger.Error(err.Error())
 		t.Data["json"] = map[string]interface{}{
@@ -123,13 +135,13 @@ func (t *Authorized) GetAuthorizedCode() {
 		t.ServeJSON()
 		return
 	} else {
-		in := &pb.OfficialAccount{
+		oa := &types.OfficialAccount{
 			Appid: authorizedInfoResp.AuthorizedInfo.Appid,
 			AuthorizerAccessToken:          authorizedInfoResp.AuthorizedInfo.AccessToken,
 			AuthorizerAccessTokenExpiresIn: int64(authorizedInfoResp.AuthorizedInfo.ExpiresIn),
 			AuthorizerRefreshToken:         authorizedInfoResp.AuthorizedInfo.RefreshToken,
 		}
-		conf.WxRelayServerClient.Call(fmt.Sprintf("%s.%s", "wx_relay_server", "StoreOfficialAccountInfo"), in, in)
+		conf.WRServerRPC.StoreOfficialAccountInfo(oa)
 	}
 	// 获取公众号基本信息
 	offAcc, retCode, err = models.GetOfficialAccountBaseInfo(platformAppid, authorizedInfoResp.AuthorizedInfo.Appid)

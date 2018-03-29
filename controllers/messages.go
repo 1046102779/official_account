@@ -7,8 +7,7 @@ import (
 	"sync"
 	"time"
 
-	pb "github.com/1046102779/official_account/igrpc"
-
+	"github.com/1046102779/common/types"
 	"github.com/1046102779/official_account/common/consts"
 	"github.com/1046102779/official_account/conf"
 	. "github.com/1046102779/official_account/logger"
@@ -17,6 +16,7 @@ import (
 	"github.com/astaxie/beego/orm"
 	"github.com/chanxuehong/util"
 	"github.com/gomydodo/wxencrypter"
+	"github.com/pkg/errors"
 )
 
 type MessageController struct {
@@ -71,9 +71,15 @@ func (t *MessageController) WechatCallback() {
 	timestamp := t.GetString("timestamp")
 	nonce := t.GetString("nonce")
 	msgSignature := t.GetString("msg_signature")
-	in := &pb.OfficialAccountPlatform{}
-	conf.WxRelayServerClient.Call(fmt.Sprintf("%s.%s", "wx_relay_server", "GetOfficialAccountPlatformInfo"), in, in)
-	e, err := wxencrypter.NewEncrypter(in.Token, in.EncodingAesKey, in.Appid)
+	var (
+		oap *types.OfficialAccountPlatform
+		err error
+	)
+	if oap, err = conf.WRServerRPC.GetOfficialAccountPlatformInfo(); err != nil {
+		err = errors.Wrap(err, "GetOfficialAccountPlatformInfo")
+		return
+	}
+	e, err := wxencrypter.NewEncrypter(oap.Token, oap.EncodingAesKey, oap.Appid)
 	if err != nil {
 		Logger.Error("NewEncrypter failed. " + err.Error())
 	}

@@ -14,18 +14,14 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
-	"net/http"
-	"os"
 	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/1046102779/official_account/common/consts"
 	"github.com/1046102779/slicelement"
 	"github.com/pkg/errors"
-	"github.com/tealeg/xlsx"
 )
 
 type XlsxImportStats struct {
@@ -56,23 +52,6 @@ func CheckMobilePattern(str string) bool {
 	pattern := `^\d{9,}$`
 	p := regexp.MustCompile(pattern)
 	return p.MatchString(str)
-}
-
-// readme
-// 通用处理方法列表
-// * 1. 获取Http请求头header部分的user_id和company_id
-// * 2
-// 读取服务
-func FindServer(server string, servers []string) (name string, exist bool) {
-	if servers == nil || len(servers) <= 0 || server == "" {
-		return "", false
-	}
-	for index := 0; index < len(servers); index++ {
-		if strings.HasPrefix(servers[index], server) {
-			return servers[index], true
-		}
-	}
-	return "", false
 }
 
 // 生成随机字符串
@@ -172,61 +151,6 @@ func GetEarliestDate(now *time.Time) (ret time.Time, err error) {
 	if err != nil {
 		err = errors.Wrap(err, "getEarliestDate")
 		return
-	}
-	return
-}
-
-func ReadRowsFromFile(id int, req *http.Request, formKey string, dir string) (output [][][]string, retCode int, err error) {
-	var fileXlsx *xlsx.File
-	// 读写文件
-	req.ParseMultipartForm(32 << 20)
-	file, header, err := req.FormFile(formKey)
-	if err != nil {
-		retCode = consts.FILE_OPEN_FAILED
-		return
-	}
-	defer file.Close()
-	os.Mkdir(fmt.Sprintf("%s/%d", dir, id), os.ModePerm)
-	fileName := fmt.Sprintf("%s_%s.%s", formKey, time.Now().Format("20060102150405"), strings.Split(header.Filename, ".")[1])
-	newFile, err := os.OpenFile(fmt.Sprintf("%s/%d/%s", dir, id, fileName), os.O_WRONLY|os.O_CREATE, 0666)
-	if err != nil {
-		retCode = consts.ERROR_CODE__SOURCE_DATA__ILLEGAL
-		return
-	}
-	defer newFile.Close()
-	if _, err = io.Copy(newFile, file); err != nil {
-		err = errors.Wrap(err, "ReadRowsFromFile")
-		return
-	}
-	if fileXlsx, err = xlsx.OpenFile(fmt.Sprintf("%s/%d/%s", dir, id, fileName)); err != nil {
-		err = errors.Wrap(err, "ReadRowsFromFile")
-		retCode = consts.FILE_OPEN_FAILED
-		return
-	}
-	if output, err = fileXlsx.ToSlice(); err != nil {
-		err = errors.Wrap(err, "ReadRowsFromFile")
-		retCode = consts.FILE_READ_FAILED
-	}
-	return
-}
-func GetColorNameAndCode(mixColor string) (colors []string) {
-	if mixColor == "" {
-		return
-	}
-	colors = strings.Split(mixColor, "#")
-	if colors == nil || len(colors) <= 0 {
-		return
-	}
-	if len(colors) == 1 {
-		colors = append(colors, colors[0])
-		return
-	}
-	if colors[0] == "" && colors[1] == "" {
-		return nil
-	} else if colors[0] == "" {
-		colors[0] = colors[1]
-	} else if colors[1] == "" {
-		colors[1] = colors[0]
 	}
 	return
 }

@@ -8,9 +8,9 @@ import (
 	"github.com/1046102779/official_account/conf"
 	. "github.com/1046102779/official_account/logger"
 	"github.com/astaxie/beego/orm"
-	"github.com/chanxuehong/wechat/mch"
-	"github.com/chanxuehong/wechat/mch/pay"
 	"github.com/pkg/errors"
+	"gopkg.in/chanxuehong/wechat.v2/mch/core"
+	"gopkg.in/chanxuehong/wechat.v2/mch/pay"
 )
 
 type WechatPayParamInfo struct {
@@ -114,7 +114,7 @@ func UnifiedOrder(id int, bill *BillInfo, openId string, tradeType string, attac
 	unifiedOrderReqMap["trade_type"] = tradeType
 	unifiedOrderReqMap["openid"] = openId
 	unifiedOrderReqMap["product_id"] = ""
-	unifiedOrderReqMap["sign"] = mch.Sign(unifiedOrderReqMap, payParamInfo.Appkey, nil)
+	unifiedOrderReqMap["sign"] = core.Sign(unifiedOrderReqMap, payParamInfo.Appkey, nil)
 
 	Logger.Debug("Get unified order:: request:: [%v]", unifiedOrderReqMap)
 	/* ::TODO 建议用微信支付安全证书
@@ -126,7 +126,7 @@ func UnifiedOrder(id int, bill *BillInfo, openId string, tradeType string, attac
 	}
 	proxy := mch.NewProxy(payParamInfo.Appid, payParamInfo.MchId, payParamInfo.Appkey, client)
 	*/
-	proxy := mch.NewProxy(payParamInfo.Appid, payParamInfo.MchId, payParamInfo.Appkey, nil)
+	proxy := core.NewClient(payParamInfo.Appid, payParamInfo.MchId, payParamInfo.Appkey, nil)
 	unifiedOrderRespMap = make(map[string]string)
 	unifiedOrderRespMap, err = pay.UnifiedOrder(proxy, unifiedOrderReqMap)
 	if err != nil {

@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	pb "github.com/1046102779/official_account/igrpc"
 	"github.com/astaxie/beego/orm"
 
+	"github.com/1046102779/common/types"
 	"github.com/1046102779/official_account/common/consts"
 	"github.com/1046102779/official_account/common/httpRequest"
 	"github.com/1046102779/official_account/conf"
@@ -83,9 +83,11 @@ func GetAuthorierAccessTokenById(id int, o *orm.Ormer) (token string, retcode in
 		return
 	}
 	if offAcc.Appid != "" {
-		in := &pb.OfficialAccount{Appid: offAcc.Appid}
-		conf.WxRelayServerClient.Call(fmt.Sprintf("%s.%s", "wx_relay_server", "GetOfficialAccountInfo"), in, in)
-		token = in.AuthorizerAccessToken
+		var oa *types.OfficialAccount
+		if oa, err = conf.WRServerRPC.GetOfficialAccountInfo(offAcc.Appid); err != nil {
+			err = errors.Wrap(err, "GetAuthorierAccessTokenById")
+		}
+		token = oa.AuthorizerAccessToken
 	}
 	return
 }

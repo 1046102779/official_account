@@ -4,10 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/1046102779/common/types"
 	"github.com/1046102779/official_account/common/httpRequest"
 	"github.com/1046102779/official_account/conf"
-	pb "github.com/1046102779/official_account/igrpc"
 	. "github.com/1046102779/official_account/logger"
+	"github.com/pkg/errors"
 )
 
 type CustomerServices struct{}
@@ -25,6 +26,7 @@ type MessageInfo struct {
 func (t *CustomerServices) SendMessage(appid string, touser string, msgType string, content string) {
 	Logger.Info("[%v] enter SendMessage.", touser)
 	defer Logger.Info("[%v] left SendMessage.", touser)
+	var err error
 	message := &MessageInfo{
 		ToUser:  touser,
 		MsgType: msgType,
@@ -33,10 +35,13 @@ func (t *CustomerServices) SendMessage(appid string, touser string, msgType stri
 		},
 	}
 	fmt.Println("send message info: ", *message)
-	in := &pb.OfficialAccount{Appid: appid}
-	conf.WxRelayServerClient.Call(fmt.Sprintf("%s.%s", "wx_relay_server", "GetOfficialAccountInfo"), in, in)
-	if in.AuthorizerAccessToken != "" {
-		httpStr := fmt.Sprintf("https://api.weixin.qq.com/cgi-bin/message/custom/send?access_token=%s", in.AuthorizerAccessToken)
+	var oa *types.OfficialAccount
+	if oa, err = conf.WRServerRPC.GetOfficialAccountInfo(appid); err != nil {
+		err = errors.Wrap(err, "SendMessage")
+		return
+	}
+	if oa.AuthorizerAccessToken != "" {
+		httpStr := fmt.Sprintf("https://api.weixin.qq.com/cgi-bin/message/custom/send?access_token=%s", oa.AuthorizerAccessToken)
 		bodyData, _ := json.Marshal(*message)
 		retBody, _ := httpRequest.HttpPostBody(httpStr, bodyData)
 		fmt.Println("result: ", string(retBody))

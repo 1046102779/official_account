@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/1046102779/official_account/common/consts"
@@ -8,7 +9,6 @@ import (
 	"github.com/1046102779/official_account/models"
 	"github.com/astaxie/beego"
 	"github.com/astaxie/beego/orm"
-	"github.com/json-iterator/go"
 	"github.com/pkg/errors"
 )
 
@@ -75,7 +75,7 @@ func (t *AccountMessageTemplatesController) AddAccountMessageTemplate() {
 		messageTemplateInfo *MessageTemplateInfo = new(MessageTemplateInfo)
 	)
 	id, _ := t.GetInt(":id")
-	if err := jsoniter.Unmarshal(t.Ctx.Input.RequestBody, messageTemplateInfo); err != nil {
+	if err := json.Unmarshal(t.Ctx.Input.RequestBody, messageTemplateInfo); err != nil {
 		Logger.Error(err.Error())
 		t.Data["json"] = map[string]interface{}{
 			"err_code": consts.ERROR_CODE__JSON__PARSE_FAILED,

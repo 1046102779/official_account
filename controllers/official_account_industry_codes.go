@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -9,7 +10,6 @@ import (
 	"github.com/1046102779/official_account/models"
 	"github.com/astaxie/beego"
 	"github.com/astaxie/beego/orm"
-	"github.com/json-iterator/go"
 	"github.com/pkg/errors"
 )
 
@@ -179,7 +179,7 @@ func (t *OfficialAccountIndustryCodesController) UpdateOfficialAccountIndustryCo
 		t.ServeJSON()
 		return
 	}
-	if err := jsoniter.Unmarshal(t.Ctx.Input.RequestBody, industryInfo); err != nil {
+	if err := json.Unmarshal(t.Ctx.Input.RequestBody, industryInfo); err != nil {
 		Logger.Error(err.Error())
 		t.Data["json"] = map[string]interface{}{
 			"err_code": consts.ERROR_CODE__JSON__PARSE_FAILED,

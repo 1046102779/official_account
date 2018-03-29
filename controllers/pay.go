@@ -6,16 +6,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/1046102779/common/types"
 	"github.com/1046102779/official_account/common/consts"
 	. "github.com/1046102779/official_account/common/utils"
-	"github.com/1046102779/official_account/conf"
-	pb "github.com/1046102779/official_account/igrpc"
 	. "github.com/1046102779/official_account/logger"
 	"github.com/1046102779/official_account/models"
+	"gopkg.in/chanxuehong/wechat.v2/mch/core"
 
 	"github.com/astaxie/beego"
 	"github.com/chanxuehong/util"
-	"github.com/chanxuehong/wechat/mch"
 )
 
 const (
@@ -81,7 +80,7 @@ func (w *WechatPayController) GetPayJsapiParams() {
 	wcPayParams["nonceStr"] = "nonce_str"
 	wcPayParams["package"] = "prepay_id=" + prepayId
 	wcPayParams["signType"] = "MD5"
-	wcPayParams["paySign"] = mch.Sign(wcPayParams, payParamInfo.Appkey, nil)
+	wcPayParams["paySign"] = core.Sign(wcPayParams, payParamInfo.Appkey, nil)
 	w.Data["json"] = map[string]interface{}{
 		"wc_pay_params": wcPayParams,
 		"err_code":      0,
@@ -147,22 +146,15 @@ func (w *WechatPayController) NotifyUrl() {
 			fmt.Println("reqMap: ", reqMap)
 			money := ConvertStrToInt(reqMap["total_fee"])
 			switch reqMap["attach"] {
-			case consts.TYPE_PAY_ENV__WECHAT__SMS_RECHARGE:
-				// 平台短信充值业务
-				in := &pb.SmsRechargeOrderInfo{
-					OutTradeNo:    reqMap["out_trade_no"],
-					TransactionId: reqMap["transaction_id"],
-					Money:         int64(money),
-				}
-				conf.SmsClient.Call(fmt.Sprintf("%s.%s", "sms", "UpdateSmsRechargeInfo"), in, in)
 			case consts.TYPE_PAY_ENV__WECHAT__FABRIC_ORDER:
-				// SaaS平台商家面料交易业务
-				in := &pb.FabricPatternPayInfo{
+				// SaaS平台商家商品交易业务
+				ppi := &types.ProductPayInfo{
 					TradeNo:       reqMap["out_trade_no"],
 					TransactionId: reqMap["transaction_id"],
 					Money:         int64(money),
 				}
-				conf.SaleClient.Call(fmt.Sprintf("%s.%s", "sales", "UpdateSaleOrderPayInfo"), in, in)
+				fmt.Printf("%v\n", ppi)
+				//conf.SaleClient.Call(fmt.Sprintf("%s.%s", "sales", "UpdateSaleOrderPayInfo"), in, in)
 			}
 		}
 	}

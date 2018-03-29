@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/1046102779/common/types"
 	"github.com/1046102779/official_account/common/consts"
 	"github.com/1046102779/official_account/conf"
-	pb "github.com/1046102779/official_account/igrpc"
 	. "github.com/1046102779/official_account/logger"
 	"github.com/pkg/errors"
 
@@ -157,9 +157,13 @@ func (t *OfficialAccountIndustryCodes) UpdateOfficialAccountIndustryCodeNoLock(o
 				retcode = consts.ERROR_CODE__DB__READ
 				return
 			}
-			in := &pb.OfficialAccount{Appid: officialAccount.Appid}
-			conf.WxRelayServerClient.Call(fmt.Sprintf("%s.%s", "wx_relay_server", "GetOfficialAccountInfo"), in, in)
-			retcode, err = weMessageTemplate.SetOfficialAccountIndustry(t.IndustryId1, t.IndustryId2, in.AuthorizerAccessToken)
+			var oa *types.OfficialAccount
+			if oa, err = conf.WRServerRPC.GetOfficialAccountInfo(officialAccount.Appid); err != nil {
+				err = errors.Wrap(err, "UpdateOfficialAccountIndustryCodeNoLock")
+				return
+			}
+			retcode, err = weMessageTemplate.SetOfficialAccountIndustry(
+				t.IndustryId1, t.IndustryId2, oa.AuthorizerAccessToken)
 			if err != nil {
 				err = errors.Wrap(err, "UpdateOfficialAccountIndustryCodeNoLock")
 				return

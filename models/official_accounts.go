@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/1046102779/common/types"
 	"github.com/1046102779/official_account/common/consts"
 	"github.com/1046102779/official_account/conf"
-	pb "github.com/1046102779/official_account/igrpc"
 	. "github.com/1046102779/official_account/logger"
 	"github.com/pkg/errors"
 
@@ -114,18 +114,21 @@ func GetOfficialAccountBaseInfo(platformAppid string, appid string) (offAcc *Off
 	)
 	now := time.Now()
 	authorizer := new(Authorizer)
-	in := &pb.OfficialAccountPlatform{}
-	conf.WxRelayServerClient.Call(fmt.Sprintf("%s.%s", "wx_relay_server", "GetOfficialAccountPlatformInfo"), in, in)
-	authorizer, retcode, err = GetOfficialAccountBaseInfoExternal(in.ComponentAccessToken, platformAppid, appid)
+	var oap *types.OfficialAccountPlatform
+	if oap, err = conf.WRServerRPC.GetOfficialAccountPlatformInfo(); err != nil {
+		err = errors.Wrap(err, "rpc wechat platform failed.")
+		return
+	}
+	authorizer, retcode, err = GetOfficialAccountBaseInfoExternal(oap.ComponentAccessToken, platformAppid, appid)
 	if err != nil {
 		err = errors.Wrap(err, "authorized get baseinfo failed.")
 		return
 	}
-	for index := 0; authorizer.AuthorizationInfo.FuncInfos != nil && index < len(authorizer.AuthorizationInfo.FuncInfos); index++ {
+	for _, item := range authorizer.AuthorizationInfo.FuncInfos {
 		if funcIdStr == "" {
-			funcIdStr = fmt.Sprintf("%d", authorizer.AuthorizationInfo.FuncInfos[index].FuncScope.Id)
+			funcIdStr = fmt.Sprintf("%d", item.FuncScope.Id)
 		} else {
-			funcIdStr = fmt.Sprintf("%s,%d", funcIdStr, authorizer.AuthorizationInfo.FuncInfos[index].FuncScope.Id)
+			funcIdStr = fmt.Sprintf("%s,%d", funcIdStr, item.FuncScope.Id)
 		}
 	}
 	o := orm.NewOrm()

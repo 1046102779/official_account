@@ -98,8 +98,6 @@ func (t *OfficialAccountUsersController) GetWechatUserBinding() {
 			"err_code": retcode,
 			"err_msg":  errors.Cause(err).Error(),
 		}
-		t.ServeJSON()
-		return
 	} else {
 		t.Data["json"] = map[string]interface{}{
 			"err_code":       0,

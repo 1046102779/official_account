@@ -11,10 +11,10 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/1046102779/common/types"
 	"github.com/1046102779/official_account/common/consts"
 	"github.com/1046102779/official_account/common/httpRequest"
 	"github.com/1046102779/official_account/conf"
-	pb "github.com/1046102779/official_account/igrpc"
 	. "github.com/1046102779/official_account/logger"
 	"github.com/astaxie/beego/orm"
 	"github.com/pkg/errors"
@@ -77,9 +77,12 @@ func OfficialAccountAuthorizationUser(id int, callbackUrl string) (httpStr strin
 		return
 	}
 	appid := officialAccount.Appid
-	in := &pb.OfficialAccountPlatform{}
-	conf.WxRelayServerClient.Call(fmt.Sprintf("%s.%s", "wx_relay_server", "GetOfficialAccountPlatformInfo"), in, in)
-	httpStr = fmt.Sprintf("https://open.weixin.qq.com/connect/oauth2/authorize?appid=%s&redirect_uri=%s&response_type=code&scope=%s&component_appid=%s#wechat_redirect", appid, url.QueryEscape(callbackUrl), "snsapi_userinfo", in.Appid)
+	var oap *types.OfficialAccountPlatform
+	if oap, err = conf.WRServerRPC.GetOfficialAccountPlatformInfo(); err != nil {
+		err = errors.Wrap(err, "OfficialAccountAuthorizationUser")
+		return
+	}
+	httpStr = fmt.Sprintf("https://open.weixin.qq.com/connect/oauth2/authorize?appid=%s&redirect_uri=%s&response_type=code&scope=%s&component_appid=%s#wechat_redirect", appid, url.QueryEscape(callbackUrl), "snsapi_userinfo", oap.Appid)
 	return
 }
 
@@ -92,7 +95,12 @@ type BindingSimpleInfo struct {
 // param bindingStatus // 微信是否已经绑定过用户
 // param user, customer // 如果已绑定，则返回id等信息
 // 通过code换取access_token
-func GetUserAccessToken(appid string, code string) (bindingStatus int16, user *BindingSimpleInfo, customer *BindingSimpleInfo, openid string, retcode int, err error) {
+func GetUserAccessToken(appid string, code string) (
+	bindingStatus int16,
+	user *BindingSimpleInfo,
+	customer *BindingSimpleInfo,
+	openid string,
+	retcode int, err error) {
 	Logger.Info("[%v] enter GetUserAccessToken.", appid)
 	defer Logger.Info("[%v] left GetUserAccessToken.", appid)
 	var (
@@ -102,9 +110,12 @@ func GetUserAccessToken(appid string, code string) (bindingStatus int16, user *B
 	)
 	user = new(BindingSimpleInfo)
 	customer = new(BindingSimpleInfo)
-	in := &pb.OfficialAccountPlatform{}
-	conf.WxRelayServerClient.Call(fmt.Sprintf("%s.%s", "wx_relay_server", "GetOfficialAccountPlatformInfo"), in, in)
-	httpStr := fmt.Sprintf("https://api.weixin.qq.com/sns/oauth2/component/access_token?appid=%s&code=%s&grant_type=authorization_code&component_appid=%s&component_access_token=%s", appid, code, in.Appid, in.ComponentAccessToken)
+	var oap *types.OfficialAccountPlatform
+	if oap, err = conf.WRServerRPC.GetOfficialAccountPlatformInfo(); err != nil {
+		err = errors.Wrap(err, "get wechat platform token failed rpc")
+		return
+	}
+	httpStr := fmt.Sprintf("https://api.weixin.qq.com/sns/oauth2/component/access_token?appid=%s&code=%s&grant_type=authorization_code&component_appid=%s&component_access_token=%s", appid, code, oap.Appid, oap.ComponentAccessToken)
 	if retJson, err = httpRequest.HttpGetJson(httpStr); err != nil {
 		err = errors.Wrap(err, "GetUserAccessToken")
 		retcode = consts.ERROR_CODE__HTTP__CALL_FAILD_EXTERNAL
@@ -140,36 +151,39 @@ func GetUserAccessToken(appid string, code string) (bindingStatus int16, user *B
 		return
 	}
 	// 填充绑定要返回的信息
-	if bindingStatus == consts.TYPE__WECHAT_USER_BINDING__USER {
+	switch bindingStatus {
+	case consts.TYPE__WECHAT_USER_BINDING__USER:
 		// rpc 获取B端用户信息
-		userRpc := &pb.User{
-			UserId: int64(userId),
-			Type:   consts.TYPE__WECHAT_USER_BINDING__USER,
+		user.Id = userId
+		user.Mobile, err = conf.UserServerRPC.GetWechatBindingUserInfo(userId, consts.TYPE__WECHAT_USER_BINDING__USER)
+		if err != nil {
+			err = errors.Wrap(err, "rpc get b-end user info failed")
+			return
 		}
-		conf.AccountClient.Call(fmt.Sprintf("%s.%s", "accounts", "GetWechatBindingUserInfo"), userRpc, userRpc)
-		user.Id = int(userRpc.UserId)
-		user.Mobile = userRpc.Mobile
-	} else if bindingStatus == consts.TYPE__WECHAT_USER_BINDING__CUSTOMER {
+	case consts.TYPE__WECHAT_USER_BINDING__CUSTOMER:
 		//  rpc 获取客户信息
-		customerRpc := &pb.User{
-			UserId: int64(customerId),
-			Type:   consts.TYPE__WECHAT_USER_BINDING__CUSTOMER,
+		customer.Id = customerId
+		customer.Mobile, err =
+			conf.UserServerRPC.GetWechatBindingUserInfo(customerId, consts.TYPE__WECHAT_USER_BINDING__CUSTOMER)
+		if err != nil {
+			err = errors.Wrap(err, "rpc get c-end user info failed.")
 		}
-		conf.AccountClient.Call(fmt.Sprintf("%s.%s", "accounts", "GetWechatBindingUserInfo"), customerRpc, customerRpc)
-		customer.Id = int(customerRpc.UserId)
-		customer.Mobile = customerRpc.Mobile
-	} else {
+	default:
 		bindingStatus = consts.TYPE__WECHAT_USER_BINDING__NO
 	}
 	return
 }
 
-func AddAuthorizationUserWxInfo(base *WxBaseInfoResp, appid string) (bindingStatus int16, userId int, customerId int, retcode int, err error) {
+func AddAuthorizationUserWxInfo(base *WxBaseInfoResp, appid string) (
+	bindingStatus int16,
+	userId int,
+	customerId int,
+	retcode int, err error) {
 	Logger.Info("[%v] enter AddAuthorizationUserWxInfo.", appid)
 	defer Logger.Info("[%v] left AddAuthorizationUserWxInfo.", appid)
 	var (
-		userWxInfos          []UserWxInfos          = []UserWxInfos{}
-		officialAccountUsers []OfficialAccountUsers = []OfficialAccountUsers{}
+		userWxInfos          = []UserWxInfos{}
+		officialAccountUsers = []OfficialAccountUsers{}
 		num                  int64
 		userWxInfoId         int
 	)

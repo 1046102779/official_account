@@ -5,11 +5,12 @@
 package controllers
 
 import (
+	"encoding/json"
+
 	"github.com/1046102779/official_account/common/consts"
 	. "github.com/1046102779/official_account/logger"
 	"github.com/1046102779/official_account/models"
 	"github.com/astaxie/beego"
-	"github.com/json-iterator/go"
 	"github.com/pkg/errors"
 )
 
@@ -73,7 +74,7 @@ func (t *OfficialAccountsPayParamsController) ModifyWechatParams() {
 		t.ServeJSON()
 		return
 	}
-	if err := jsoniter.Unmarshal(t.Ctx.Input.RequestBody, payParamInfo); err != nil {
+	if err := json.Unmarshal(t.Ctx.Input.RequestBody, payParamInfo); err != nil {
 		Logger.Error(err.Error())
 		t.Data["json"] = map[string]interface{}{
 			"err_code": consts.ERROR_CODE__JSON__PARSE_FAILED,
